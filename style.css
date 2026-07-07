@@ -1,0 +1,459 @@
+/* Times Table Gym — "The Training Board" redesign (theo).
+   Presentational only. All ids/classes/hooks are the scripts' contract and are
+   preserved; this file only restyles them. See DESIGN-NOTES.md for the concept.
+   Signature element: the mastery heatmap, rendered as a physical strength board. */
+
+:root {
+  /* core palette — spruce structure + one warm energy accent */
+  --board:  #efeadf;   /* page bg — the gym wall */
+  --paper:  #faf7f0;   /* panels / cards — warm chalk */
+  --ink:    #23201c;   /* body text — warm near-black */
+  --spruce: #17423b;   /* structural brand */
+  --spruce-2: #1d5249; /* lighter spruce for hovers/edges */
+  --ember:  #b8461a;   /* energy accent: CTAs, focus, active */
+  --ember-d:#983a15;   /* darker ember for pressed/hover */
+  --muted:  #6c6558;   /* warm secondary text */
+  --line:   #ddd6c7;   /* warm hairline */
+
+  /* the Board is a dark physical training board matted on the chalk card */
+  --mat:    #10302b;   /* deep spruce-charcoal — the board itself */
+  --mat-edge: #0a231f; /* recessed inner edge */
+  --chalk:  #dfe6e2;   /* label ink on the dark board */
+
+  /* mastery ramp — the signature: an UNLIT board that heats up and GLOWS.
+     Monotonic brightening (dormant recedes into the mat, mastery pops). */
+  --b-unseen:   #24433c;   /* unlit tile */
+  --b-weak:     #8a4a26;   /* first heat — dim ember */
+  --b-ok:       #c06a24;   /* warming — amber */
+  --b-strong:   #e68a2b;   /* working — bright orange */
+  --b-mastered: #f6b23e;   /* forged — hottest, glowing gold */
+
+  /* legibility signals */
+  --good: #2f6b4f;  /* spruce-family "correct" — not a clashing green */
+  --bad:  #b8461a;  /* ember — a miss is "not yet", not an alarm */
+
+  /* type roles */
+  --font-display: "Bahnschrift", "DIN Condensed", "DIN Alternate",
+                  "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-data: "Cascadia Mono", "Cascadia Code", ui-monospace,
+               "SFMono-Regular", "Menlo", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.55 var(--font-body);
+  color: var(--ink);
+  background: var(--board);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ---- header plate --------------------------------------------------- */
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px 20px; padding: 12px 22px; flex-wrap: wrap;
+  background: var(--spruce);
+  color: #f3efe6;
+  border-bottom: 3px solid var(--ember);
+}
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 25px; letter-spacing: .015em;
+  text-transform: uppercase; line-height: 1;
+  color: #f6f2e9;
+}
+.brand .lvl {
+  font-family: var(--font-data);
+  font-size: 11px; font-weight: 600; letter-spacing: .06em;
+  text-transform: none;
+  color: var(--board);
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 999px; padding: 2px 8px;
+  vertical-align: 2px; margin-left: 6px;
+}
+.profile {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #d7e2dd;
+}
+.profile label { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ---- nav — station tabs --------------------------------------------- */
+nav {
+  display: flex; gap: 2px; padding: 0 16px; flex-wrap: wrap;
+  background: var(--spruce);
+}
+nav button {
+  font-family: var(--font-display);
+  font-size: 15px; letter-spacing: .04em; text-transform: uppercase;
+  background: transparent; color: #cdd8d2;
+  border: 0; border-bottom: 3px solid transparent;
+  border-radius: 0; padding: 10px 15px 9px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+nav button:hover { color: #fff; background: rgba(255,255,255,.06); }
+nav button.active {
+  color: #fff; border-bottom-color: var(--ember); font-weight: 700;
+}
+
+main { max-width: 940px; margin: 0 auto; padding: 22px 18px 72px; }
+
+footer {
+  text-align: center; color: var(--muted); font-size: 12px;
+  padding: 18px 16px 26px; max-width: 940px; margin: 0 auto;
+}
+
+/* ---- typography ----------------------------------------------------- */
+h1 {
+  font-family: var(--font-display);
+  font-size: 34px; font-weight: 700; letter-spacing: .01em;
+  text-transform: uppercase; line-height: 1.05;
+  margin: 6px 0 18px; color: var(--spruce);
+}
+h2 {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 700; letter-spacing: .02em;
+  text-transform: uppercase; color: var(--ink);
+  margin: 0 0 12px;
+}
+
+/* ---- controls ------------------------------------------------------- */
+button {
+  font: 600 14px/1 var(--font-body);
+  cursor: pointer; padding: 9px 15px; border-radius: 8px;
+  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  transition: background .14s, border-color .14s, color .14s, transform .05s;
+}
+button:hover { border-color: var(--spruce); }
+button:active { transform: translateY(1px); }
+button.primary {
+  background: var(--ember); color: #fff; border-color: var(--ember);
+  letter-spacing: .015em;
+}
+button.primary:hover { background: var(--ember-d); border-color: var(--ember-d); }
+button:disabled { opacity: .45; cursor: default; transform: none; }
+
+/* header controls belong to the spruce plate: a chalk locker-tag select and an
+   ember-outlined "+ New" — deliberately of this world, not stock gray pills */
+header button {
+  background: transparent; color: #ffd9c2;
+  border: 1px solid var(--ember);
+  font-weight: 700; letter-spacing: .01em;
+}
+header button:hover { background: var(--ember); color: #fff; border-color: var(--ember); }
+
+select, input[type=text], input[type=number] {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--line);
+  border-radius: 8px; background: #fff; color: var(--ink);
+}
+header select {
+  font-family: var(--font-data); font-size: 13px; font-weight: 600;
+  background: rgba(255,255,255,.08); color: #f6f2e9;
+  border: 1px solid rgba(255,255,255,.35);
+}
+header select option { color: var(--ink); }
+
+/* one focus treatment everywhere */
+:focus-visible {
+  outline: 3px solid var(--ember);
+  outline-offset: 2px; border-radius: 6px;
+}
+nav button:focus-visible, header button:focus-visible, header select:focus-visible {
+  outline-color: #ffb27a; outline-offset: -3px;
+}
+
+/* ---- panels & cards ------------------------------------------------- */
+.panel {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: 12px; padding: 18px 20px; margin: 14px 0;
+}
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.muted { color: var(--muted); }
+.big {
+  font-family: var(--font-data);
+  font-size: 44px; font-weight: 700; letter-spacing: -.01em;
+  color: var(--spruce); line-height: 1;
+}
+
+/* ---- scorecard tiles ------------------------------------------------ */
+.tiles { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.tile {
+  background: var(--paper); border: 1px solid var(--line);
+  border-left: 4px solid var(--spruce);
+  border-radius: 10px; padding: 12px 16px; min-width: 132px; flex: 1;
+}
+.tile .k {
+  color: var(--muted); font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.tile .v {
+  font-family: var(--font-data);
+  font-size: 27px; font-weight: 700; color: var(--ink); line-height: 1.1;
+  margin-top: 2px;
+}
+.tile .muted { font-size: 12px; }
+
+/* ---- SIGNATURE: the Board (mastery heatmap) ------------------------- */
+/* A dark training board, matted and recessed into the chalk card so it reads
+   as a physical object you're facing — not a spreadsheet with pastel fills. */
+.heatwrap {
+  position: relative;
+  overflow-x: auto; padding: 16px;
+  background: var(--mat);
+  border: 1px solid var(--mat-edge);
+  border-radius: 12px;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);
+  margin-top: 12px;
+}
+table.heat { border-collapse: separate; border-spacing: 4px; margin: 0 auto; }
+table.heat th {
+  font-family: var(--font-data);
+  color: var(--chalk); font-weight: 600; font-size: 11px;
+  padding: 1px 3px; opacity: .78;
+}
+table.heat th.rowh { text-align: right; padding-right: 8px; opacity: .92; }
+table.heat tr:first-child th { opacity: .92; }
+table.heat td {
+  width: 26px; height: 26px; min-width: 26px; text-align: center;
+  font-family: var(--font-data); font-size: 10px;
+  border-radius: 4px; color: #6f9084;
+  transition: transform .1s ease, box-shadow .1s ease;
+  cursor: default;
+}
+table.heat td:hover {
+  transform: translateY(-2px) scale(1.12);
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  position: relative; z-index: 2;
+}
+td.b-unseen   { background: var(--b-unseen);   color: #6f9084; }
+td.b-weak     { background: var(--b-weak);     color: #f2e2d3; }
+td.b-ok       { background: var(--b-ok);       color: #40230a; }
+td.b-strong   { background: var(--b-strong);   color: #341f06; }
+/* mastered tiles glow — a soft heat halo marks the forged cells */
+td.b-mastered {
+  background: var(--b-mastered); color: #3a2408;
+  box-shadow: 0 0 7px rgba(246,178,62,.55);
+}
+
+/* mobile scroll affordance: the board fades at its right edge when it overflows */
+.heatwrap::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 34px;
+  pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, rgba(16,48,43,0), var(--mat));
+  border-radius: 0 12px 12px 0;
+}
+.heatwrap { scrollbar-color: var(--b-strong) var(--mat-edge); }
+.heatwrap::-webkit-scrollbar { height: 9px; }
+.heatwrap::-webkit-scrollbar-track { background: var(--mat-edge); border-radius: 6px; }
+.heatwrap::-webkit-scrollbar-thumb { background: var(--b-ok); border-radius: 6px; }
+
+/* orchestrated moment: the board charges in, row by row, top→bottom */
+table.heat tr { animation: chargeRow .5s both; }
+table.heat tr:nth-child(1)  { animation-delay: .00s }
+table.heat tr:nth-child(2)  { animation-delay: .03s }
+table.heat tr:nth-child(3)  { animation-delay: .06s }
+table.heat tr:nth-child(4)  { animation-delay: .09s }
+table.heat tr:nth-child(5)  { animation-delay: .12s }
+table.heat tr:nth-child(6)  { animation-delay: .15s }
+table.heat tr:nth-child(7)  { animation-delay: .18s }
+table.heat tr:nth-child(8)  { animation-delay: .21s }
+table.heat tr:nth-child(9)  { animation-delay: .24s }
+table.heat tr:nth-child(10) { animation-delay: .27s }
+table.heat tr:nth-child(11) { animation-delay: .30s }
+table.heat tr:nth-child(12) { animation-delay: .33s }
+table.heat tr:nth-child(13) { animation-delay: .36s }
+table.heat tr:nth-child(14) { animation-delay: .39s }
+table.heat tr:nth-child(15) { animation-delay: .42s }
+table.heat tr:nth-child(16) { animation-delay: .45s }
+table.heat tr:nth-child(17) { animation-delay: .48s }
+table.heat tr:nth-child(18) { animation-delay: .51s }
+table.heat tr:nth-child(19) { animation-delay: .54s }
+table.heat tr:nth-child(n+20) { animation-delay: .57s }
+@keyframes chargeRow { from { opacity: 0 } to { opacity: 1 } }
+
+.legend {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px;
+  font-size: 13px; color: var(--ink);
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch {
+  width: 18px; height: 18px; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-data); font-size: 10px; color: #6f9084;
+}
+.swatch.b-weak { color: #f2e2d3; }
+.swatch.b-ok { color: #40230a; }
+.swatch.b-strong { color: #341f06; }
+.swatch.b-mastered { color: #3a2408; }
+
+/* ---- lists, badges, codes ------------------------------------------- */
+.list { list-style: none; padding: 0; margin: 0; }
+.list li {
+  padding: 9px 2px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.list li:last-child { border-bottom: 0; }
+.badge {
+  font-family: var(--font-data);
+  font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line);
+  color: var(--muted); text-transform: uppercase;
+}
+.badge.mastered { background: var(--b-mastered); color: #fff; border-color: transparent; }
+.badge.practicing { background: var(--b-ok); color: #5c3d09; border-color: transparent; }
+code, .code { font-family: var(--font-data); font-size: .95em; }
+.list .code { color: var(--spruce); font-weight: 600; }
+
+/* ---- quiz station --------------------------------------------------- */
+/* The quiz is the apparatus you spend the most time on, so it becomes a dark
+   station matching the Board — a lit equation, a live-session pulse for the
+   sprint, and answers that actually react. Scoped via :has() so only the quiz
+   card goes dark; summaries stay on chalk. */
+.panel:has(.quiz-q) {
+  background: linear-gradient(160deg, #17423b, #10302b);
+  border-color: var(--mat-edge); color: var(--chalk);
+  padding: 30px 22px 26px;
+  box-shadow: inset 0 2px 14px rgba(0,0,0,.4);
+}
+.quiz-meta {
+  text-align: center; color: var(--chalk);
+  font-family: var(--font-data); font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase;
+}
+/* live-session cue: a pulsing ember dot — the sprint is running */
+.panel:has(.quiz-q) .quiz-meta::before {
+  content: ""; display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--b-strong); margin-right: 8px;
+  vertical-align: 1px; box-shadow: 0 0 8px var(--b-strong);
+  animation: livePulse 1.1s ease-in-out infinite;
+}
+.quiz-q {
+  font-family: var(--font-data);
+  font-size: 62px; font-weight: 700; text-align: center;
+  margin: 16px 0 12px; color: #fbf7ef; letter-spacing: -.01em;
+  text-shadow: 0 0 22px rgba(246,178,62,.25);
+}
+.panel:has(.quiz-q) .quiz-q {
+  animation: snapIn .26s cubic-bezier(.2,.8,.3,1.15) both;
+}
+.quiz-answer { display: flex; gap: 10px; justify-content: center; margin: 16px 0; }
+.quiz-answer input {
+  font-family: var(--font-data); font-size: 30px; font-weight: 700;
+  width: 180px; text-align: center; padding: 6px 10px;
+  border: 2px solid var(--b-strong); background: #fbf7ef; color: var(--ink);
+}
+.quiz-answer input:focus-visible { outline-offset: 0; border-color: var(--b-mastered); }
+
+.feedback {
+  text-align: center; min-height: 56px; margin: 12px 0 2px;
+  font-size: 15px;
+}
+/* answers react: correct catches fire, a miss is a firm coach's correction */
+.feedback .good, .feedback.good {
+  display: inline-block; font-weight: 700; color: #3a2408;
+  background: var(--b-mastered); padding: 8px 16px; border-radius: 999px;
+  box-shadow: 0 0 16px rgba(246,178,62,.5);
+  animation: flareIn .34s cubic-bezier(.2,.8,.3,1.2) both;
+}
+.feedback .bad, .feedback.bad {
+  display: inline-block; font-weight: 700; color: var(--ember-d);
+  background: rgba(184,70,26,.12); border: 1px solid var(--ember);
+  padding: 8px 16px; border-radius: 999px;
+  animation: nudge .3s ease both;
+}
+.feedback .tech {
+  display: block; color: var(--ink); font-size: 13px; margin-top: 10px;
+  font-weight: 400;
+}
+/* dark-station overrides so feedback stays legible on the spruce card */
+.panel:has(.quiz-q) .feedback .bad { color: #ffe0cd; background: rgba(255,255,255,.06); }
+.panel:has(.quiz-q) .feedback .tech { color: var(--chalk); }
+.linkish {
+  background: transparent; border: 0; padding: 0 2px;
+  color: var(--b-strong); font-weight: 700; text-decoration: underline;
+  text-underline-offset: 2px; cursor: pointer; font-size: 13px;
+}
+.linkish:hover { color: var(--b-mastered); border-color: transparent; }
+
+@keyframes livePulse { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .35; transform: scale(.7) } }
+@keyframes snapIn { from { opacity: 0; transform: scale(.9) } to { opacity: 1; transform: scale(1) } }
+@keyframes flareIn { 0% { opacity: 0; transform: scale(.8) } 60% { transform: scale(1.06) } 100% { opacity: 1; transform: scale(1) } }
+@keyframes nudge { 0% { opacity: 0; transform: translateY(4px) } 100% { opacity: 1; transform: translateY(0) } }
+
+/* sprint countdown — a scoreboard clock riding above the dark station.
+   #drillClock is rendered by app.js; .ending arrives at <=10s remaining. */
+.drill-clock {
+  width: fit-content; margin: 4px auto 0;
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-data); font-weight: 700; font-size: 15px;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--chalk); background: var(--spruce);
+  padding: 7px 18px; border-radius: 999px;
+  border: 1px solid var(--mat-edge);
+}
+.drill-clock::before {
+  content: ""; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--b-strong); box-shadow: 0 0 8px var(--b-strong);
+}
+/* final ten seconds: the clock goes ember and pulses */
+.drill-clock.ending {
+  color: #fff; background: var(--ember); border-color: var(--ember-d);
+  animation: clockAlarm .9s ease-in-out infinite;
+}
+.drill-clock.ending::before { background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.9); }
+@keyframes clockAlarm {
+  0%,100% { box-shadow: 0 0 0 rgba(184,70,26,0); transform: scale(1) }
+  50% { box-shadow: 0 0 18px rgba(184,70,26,.85); transform: scale(1.04) }
+}
+
+/* ---- results -------------------------------------------------------- */
+textarea {
+  width: 100%; min-height: 84px; font-family: var(--font-data);
+  font-size: 12px; border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px; background: #fff; color: var(--ink);
+}
+.pass { color: var(--good); font-weight: 700; }
+.fail { color: var(--bad); font-weight: 700; }
+.err { color: var(--bad); }
+
+/* recall card: your last match code, held so it survives navigation. An ember
+   edge marks it as "saved for you" without shouting — it's a safety net, not a hero. */
+#lastMatch { border-left: 4px solid var(--ember); }
+#lastMatch h2 { margin-bottom: 6px; }
+#lastMatch textarea { min-height: 54px; margin-top: 4px; }
+/* copied confirmation shows only once the JS fills it (":not(:empty)").
+   The green ✓ is scoped to success only — a failure state (.err) shows honest
+   red guidance with no checkmark, so we never affirm a copy that didn't happen. */
+#lastCopyMsg:not(:empty):not(.err) {
+  display: inline-block; margin-top: 8px;
+  color: var(--good); font-weight: 700;
+}
+#lastCopyMsg:not(:empty):not(.err)::before { content: "\2713\00a0"; }
+#lastCopyMsg.err {
+  display: inline-block; margin-top: 8px; font-weight: 600;
+}
+
+hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+
+/* ---- responsive ----------------------------------------------------- */
+@media (max-width: 560px) {
+  header { padding: 10px 14px; }
+  .brand { font-size: 21px; }
+  main { padding: 18px 13px 60px; }
+  h1 { font-size: 27px; }
+  .quiz-q { font-size: 48px; }
+  .panel:has(.quiz-q) { padding: 24px 16px 22px; }
+  .tile { min-width: 100%; }
+  nav button { padding: 9px 12px; font-size: 14px; }
+  /* the Board is wider than the phone — show it can be swiped */
+  .heatwrap::after { opacity: 1; }
+}
+
+/* ---- reduced motion ------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-delay: 0 !important;
+      transition-duration: .001ms !important; }
+  table.heat td:hover { transform: none; }
+}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Times Table Gym</title>
+  <link rel="stylesheet" href="style.css?v=8">
+</head>
+<body>
+  <header>
+    <div class="brand">Times Table Gym <span class="lvl">L2</span></div>
+    <div class="profile">
+      <label>Profile:
+        <select id="profileSelect" aria-label="Active profile"></select>
+      </label>
+      <button id="newProfileBtn" type="button">+ New</button>
+    </div>
+  </header>
+
+  <nav id="nav" aria-label="Main">
+    <button data-view="gym" type="button">Gym</button>
+    <button data-view="play" type="button">Play</button>
+    <button data-view="twoplayer" type="button">Two-player</button>
+    <button data-view="lessons" type="button">Lessons</button>
+    <button data-view="puzzles" type="button">Puzzles</button>
+  </nav>
+
+  <main id="view" aria-live="polite"></main>
+
+  <footer>
+    <span>Full 2&ndash;25 grid. Data stays in this browser (localStorage), one profile at a time.</span>
+  </footer>
+
+  <script src="lessons.js?v=8"></script>
+  <script src="engine.js?v=8"></script>
+  <script src="app.js?v=8"></script>
+</body>
+</html>
