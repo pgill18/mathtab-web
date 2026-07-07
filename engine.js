@@ -100,6 +100,7 @@
       streak_current: 0,
       streak_best: 0,
       lessons: {},          // id -> {state, best_accuracy, attempts}
+      rivals: {},           // rival id -> {wins, losses, best_time}
       log: [],
     };
   }
@@ -254,6 +255,61 @@
   }
 
   // Winner decision (mirrors race status: higher score, tie-break faster time)
+  // ---- AI rivals (Phase 4) ----------------------------------------------
+  // Deterministic bots; identical FNV-1a model to tables.py so a rival + a
+  // fixed question set always behave the same (no wall-clock/Math.random).
+  function fnv() {
+    const s = Array.prototype.join.call(arguments, "|");
+    let h = 2166136261;
+    for (let k = 0; k < s.length; k++) {
+      h ^= s.charCodeAt(k);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+  function rivalById(rivals, key) {
+    key = String(key || "").trim().toLowerCase();
+    return rivals.rivals.find((r) => r.id === key || r.name.toLowerCase() === key) || null;
+  }
+  function rivalIsSpecialty(rival, i, j) {
+    const sp = rival.specialty;
+    if (!sp) return false;
+    if (sp.type === "squares") return i === j;
+    if (sp.type === "row") return i === sp.n || j === sp.n;
+    return false;
+  }
+  function rivalPlay(rival, questions) {
+    let score = 0, total = 0;
+    const per = [], timeline = [];
+    questions.forEach((q, k) => {
+      const i = q[0], j = q[1];
+      const acc = rivalIsSpecialty(rival, i, j) ? rival.specialty_accuracy : rival.accuracy;
+      const correct = (fnv(rival.id, "a", i, j, k) % 10000) < acc * 10000;
+      const jitter = ((fnv(rival.id, "t", i, j, k) % 201) - 100) / 100;
+      const t = Math.max(0.2, rival.speed + jitter * rival.variance);
+      if (correct) score++;
+      total += t;
+      per.push(!!correct);
+      timeline.push({ i, j, correct: !!correct, t: Math.round(t * 100) / 100 });
+    });
+    return { score, time: Math.round(total * 100) / 100, per, timeline };
+  }
+  function ladderRank(data, rivals) {
+    let rank = 0;
+    for (const rid of rivals.ladder) {
+      if ((data.rivals[rid] && data.rivals[rid].wins) > 0) rank++;
+      else break;
+    }
+    return rank;
+  }
+  function recordRivalResult(data, rivalId, won, youTime) {
+    const st = data.rivals[rivalId] || { wins: 0, losses: 0, best_time: null };
+    if (won) st.wins++; else st.losses++;
+    if (st.best_time === null || youTime < st.best_time) st.best_time = Math.round(youTime * 100) / 100;
+    data.rivals[rivalId] = st;
+    return st;
+  }
+
   function decideWinner(aName, aRes, bName, bRes) {
     if (aRes.score !== bRes.score) {
       return { winner: aRes.score > bRes.score ? aName : bName, reason: "higher score", draw: false };
@@ -290,6 +346,7 @@
     weakestCells, passBar, lessonStateFromAccuracy, lessonState,
     applyLessonResult, overallMastery, rowCells, diagonalCells, blockCells,
     encodeMatch, decodeMatch, decideWinner,
+    fnv, rivalById, rivalIsSpecialty, rivalPlay, ladderRank, recordRivalResult,
     randInt, randCell, randQuestions, sample, shuffle,
   };
 });

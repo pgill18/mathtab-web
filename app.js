@@ -6,6 +6,7 @@
   "use strict";
   const E = window.Engine;
   const LESSONS = window.LESSONS;
+  const RIVALS = window.RIVALS;
   const $ = (sel, el = document) => el.querySelector(sel);
   const view = $("#view");
 
@@ -223,7 +224,8 @@
         <div class="legend">${legend}</div>
       </div>
       <div class="panel"><h2>Lesson progress</h2><ul class="list">${lessonList}</ul></div>
-      <div class="panel"><h2>Top 10 weakest cells</h2><ul class="list">${weakList}</ul></div>`;
+      <div class="panel"><h2>Top 10 weakest cells</h2><ul class="list">${weakList}</ul></div>
+      ${rivalsStandingsHTML(u)}`;
   };
 
   views.play = function () {
@@ -375,6 +377,110 @@
     host.innerHTML = summaryPanel(res,
       `<p>Lesson progress: <b>${prog.state}</b> (best accuracy ${pct(prog.best_accuracy)}%)</p>`);
     $("#doneBtn", host).onclick = () => views.lessons();
+  }
+
+  // ---- Rivals & ladder (Phase 4) — placeholder styling per spec ---------
+  function rivalStanding(u, rid) {
+    const st = u.rivals[rid] || { wins: 0, losses: 0, best_time: null };
+    let s = `W-L ${st.wins || 0}-${st.losses || 0}`;
+    if (st.best_time != null) s += ` &middot; best ${st.best_time}s`;
+    return s;
+  }
+
+  // Gym dashboard section (called from views.gym).
+  function rivalsStandingsHTML(u) {
+    const rank = E.ladderRank(u, RIVALS);
+    const champ = rank >= RIVALS.ladder.length ? " &mdash; CHAMPION!" : "";
+    const rows = RIVALS.ladder.map((rid, idx) => {
+      const r = E.rivalById(RIVALS, rid);
+      const state = idx < rank ? "beaten" : idx === rank ? "next up" : "locked";
+      return `<li><span class="badge ${idx < rank ? "mastered" : ""}">${state}</span> `
+        + `<b>${esc(r.name)}</b> &mdash; ${rivalStanding(u, rid)}</li>`;
+    }).join("");
+    return `<div class="panel"><h2>Rivals &amp; ladder (rank ${rank}/${RIVALS.ladder.length}${champ})</h2>
+      <ul class="list">${rows}</ul></div>`;
+  }
+
+  views.rivals = function () {
+    const u = activeUser();
+    const rank = E.ladderRank(u, RIVALS);
+    const cast = RIVALS.rivals.map((r) => {
+      const idx = RIVALS.ladder.indexOf(r.id);
+      const locked = idx > rank; // ladder-locked, but "practice" race is always allowed
+      return `<li>
+        <b>${esc(r.name)}</b> <span class="muted">(ladder ${idx + 1})</span> &mdash; ${rivalStanding(u, r.id)}
+        <br><span class="muted">${esc(r.blurb)}</span>
+        <div class="row" style="margin-top:6px">
+          <button type="button" class="primary" data-race="${esc(r.id)}">Race ${esc(r.name.split(" ")[0])}</button>
+          ${locked ? '<span class="muted">ladder-locked, but free to practice</span>' : ""}
+        </div></li>`;
+    }).join("");
+    const nextRid = rank < RIVALS.ladder.length ? RIVALS.ladder[rank] : null;
+    const next = nextRid ? E.rivalById(RIVALS, nextRid) : null;
+    view.innerHTML = `<h1>Rivals</h1>
+      <div class="panel">
+        <h2>Ladder — rank ${rank}/${RIVALS.ladder.length}</h2>
+        ${next ? `<p>Next rung: <b>${esc(next.name)}</b>. Beat a rung to unlock the one above it.</p>
+          <button class="primary" id="ladderGo" type="button">Climb the ladder (race ${esc(next.name)})</button>`
+          : `<p class="big">CHAMPION!</p><p class="muted">You've beaten the whole ladder. Keep racing anyone for fun.</p>`}
+      </div>
+      <div class="panel"><h2>The cast</h2><ul class="list">${cast}</ul></div>`;
+    view.querySelectorAll("[data-race]").forEach((b) =>
+      b.onclick = () => raceRival(b.getAttribute("data-race"), false));
+    const lg = $("#ladderGo");
+    if (lg) lg.onclick = () => raceRival(nextRid, true);
+  };
+
+  async function raceRival(rid, fromLadder) {
+    const rival = E.rivalById(RIVALS, rid);
+    const u = activeUser();
+    const questions = E.randQuestions(E.RACE_QUESTIONS);
+    const v = rival.voice;
+    // start line
+    view.innerHTML = `<h1>Race — ${esc(rival.name)}</h1>
+      <div class="panel"><p><b>${esc(rival.name)}:</b> &ldquo;${esc(v.start)}&rdquo;</p>
+      <p class="muted">${esc(rival.blurb)}</p></div>`;
+    const host = document.createElement("div");
+    host.className = "panel";
+    view.appendChild(host);
+    const res = await quizLoop(host, (k) => (k < questions.length ? [questions[k][0], questions[k][1]] : null),
+      { user: u, labeler: (k) => `vs ${rival.name} — [${k + 1}/${questions.length}]` });
+    const rres = E.rivalPlay(rival, questions);
+    const w = E.decideWinner("you", { score: res.score, time: res.total },
+      rival.name, { score: rres.score, time: rres.time });
+    const youWon = w.winner === "you";
+    E.recordRivalResult(u, rid, youWon, res.total);
+    LS.save(u);
+    const firstOk = rres.timeline.find((t) => t.correct);
+    const firstMiss = rres.timeline.find((t) => !t.correct);
+    const beats = [
+      firstOk ? `<p><b>${esc(rival.name)}</b> (${firstOk.i}×${firstOk.j}): &ldquo;${esc(v.correct)}&rdquo;</p>` : "",
+      firstMiss ? `<p><b>${esc(rival.name)}</b> (${firstMiss.i}×${firstMiss.j}): &ldquo;${esc(v.miss)}&rdquo;</p>` : "",
+    ].join("");
+    const outcome = w.draw ? `<p class="big">Draw</p>`
+      : `<p class="big">${youWon ? "You win!" : rival.name + " wins"}</p>`
+        + `<p><b>${esc(rival.name)}:</b> &ldquo;${esc(youWon ? v.lose : v.win)}&rdquo;</p>`;
+    let ladderMsg = "";
+    if (fromLadder) {
+      const newRank = E.ladderRank(u, RIVALS);
+      ladderMsg = youWon
+        ? `<p class="pass">Rung cleared! Ladder rank ${newRank}/${RIVALS.ladder.length}.`
+          + (newRank >= RIVALS.ladder.length ? " You are the CHAMPION!" : "") + `</p>`
+        : `<p class="fail">Rung not cleared — try again.</p>`;
+    }
+    view.innerHTML = `<h1>Race result — ${esc(rival.name)}</h1>
+      <div class="panel">
+        ${beats}${outcome}
+        <ul class="list">
+          <li><b>You</b>: ${res.score}/${questions.length} in ${res.total.toFixed(1)}s</li>
+          <li><b>${esc(rival.name)}</b>: ${rres.score}/${questions.length} in ${rres.time}s</li>
+        </ul>
+        ${ladderMsg}
+        <div class="row">
+          <button class="primary" id="rvAgain" type="button">Back to Rivals</button>
+        </div>
+      </div>`;
+    $("#rvAgain").onclick = () => views.rivals();
   }
 
   views.puzzles = function () {
