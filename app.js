@@ -407,19 +407,29 @@
     const cast = RIVALS.rivals.map((r) => {
       const idx = RIVALS.ladder.indexOf(r.id);
       const locked = idx > rank; // ladder-locked, but "practice" race is always allowed
-      return `<li>
+      return `<li class="rv-cast-item" data-rival="${esc(r.id)}">
         <b>${esc(r.name)}</b> <span class="muted">(ladder ${idx + 1})</span> &mdash; ${rivalStanding(u, r.id)}
         <br><span class="muted">${esc(r.blurb)}</span>
         <div class="row" style="margin-top:6px">
-          <button type="button" class="primary" data-race="${esc(r.id)}">Race ${esc(r.name.split(" ")[0])}</button>
+          <button type="button" class="primary" data-race="${esc(r.id)}">Race ${esc(r.nickname || r.name)}</button>
           ${locked ? '<span class="muted">ladder-locked, but free to practice</span>' : ""}
         </div></li>`;
     }).join("");
     const nextRid = rank < RIVALS.ladder.length ? RIVALS.ladder[rank] : null;
     const next = nextRid ? E.rivalById(RIVALS, nextRid) : null;
+    // ladder rungs, HARDEST AT TOP (reverse of RIVALS.ladder); data-state drives
+    // theo's locked/current/cleared styling (the climbing-board visual).
+    const rungs = RIVALS.ladder.map((rid, idx) => ({ rid, idx })).reverse()
+      .map(({ rid, idx }) => {
+        const r = E.rivalById(RIVALS, rid);
+        const state = idx < rank ? "cleared" : idx === rank ? "current" : "locked";
+        return `<li class="rv-rung" data-rival="${esc(rid)}" data-state="${state}">`
+          + `<b>${esc(r.name)}</b> &mdash; ${rivalStanding(u, rid)}</li>`;
+      }).join("");
     view.innerHTML = `<h1>Rivals</h1>
       <div class="panel">
         <h2>Ladder — rank ${rank}/${RIVALS.ladder.length}</h2>
+        <ol class="rv-ladder">${rungs}</ol>
         ${next ? `<p>Next rung: <b>${esc(next.name)}</b>. Beat a rung to unlock the one above it.</p>
           <button class="primary" id="ladderGo" type="button">Climb the ladder (race ${esc(next.name)})</button>`
           : `<p class="big">CHAMPION!</p><p class="muted">You've beaten the whole ladder. Keep racing anyone for fun.</p>`}
@@ -438,7 +448,7 @@
     const v = rival.voice;
     // start line
     view.innerHTML = `<h1>Race — ${esc(rival.name)}</h1>
-      <div class="panel"><p><b>${esc(rival.name)}:</b> &ldquo;${esc(v.start)}&rdquo;</p>
+      <div class="panel rv-taunt" data-rival="${esc(rid)}"><p><b>${esc(rival.name)}:</b> &ldquo;${esc(v.start)}&rdquo;</p>
       <p class="muted">${esc(rival.blurb)}</p></div>`;
     const host = document.createElement("div");
     host.className = "panel";
@@ -464,16 +474,19 @@
     if (fromLadder) {
       const newRank = E.ladderRank(u, RIVALS);
       ladderMsg = youWon
-        ? `<p class="pass">Rung cleared! Ladder rank ${newRank}/${RIVALS.ladder.length}.`
+        ? `<p class="rv-cleared">Rung cleared! Ladder rank ${newRank}/${RIVALS.ladder.length}.`
           + (newRank >= RIVALS.ladder.length ? " You are the CHAMPION!" : "") + `</p>`
         : `<p class="fail">Rung not cleared — try again.</p>`;
     }
+    const outcomeAttr = w.draw ? "draw" : youWon ? "win" : "loss";
+    const youWinCls = (!w.draw && youWon) ? ' class="rv-winner"' : "";
+    const rivalWinCls = (!w.draw && !youWon) ? ' class="rv-winner"' : "";
     view.innerHTML = `<h1>Race result — ${esc(rival.name)}</h1>
-      <div class="panel">
+      <div class="panel" data-outcome="${outcomeAttr}">
         ${beats}${outcome}
         <ul class="list">
-          <li><b>You</b>: ${res.score}/${questions.length} in ${res.total.toFixed(1)}s</li>
-          <li><b>${esc(rival.name)}</b>: ${rres.score}/${questions.length} in ${rres.time}s</li>
+          <li${youWinCls}><b>You</b>: ${res.score}/${questions.length} in ${res.total.toFixed(1)}s</li>
+          <li${rivalWinCls}><b>${esc(rival.name)}</b>: ${rres.score}/${questions.length} in ${rres.time}s</li>
         </ul>
         ${ladderMsg}
         <div class="row">

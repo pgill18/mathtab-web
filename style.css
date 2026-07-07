@@ -437,6 +437,114 @@ textarea {
 
 hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 
+/* ============ RIVALS — the ladder, brought into the Board world ======= */
+:root {
+  --rv-tara:  #e0662a;  /* reckless-fast: hot ember    */
+  --rv-rowan: #d99a2e;  /* squares specialist: gold    */
+  --rv-sal:   #4b8391;  /* steady & careful: cool teal */
+  --rv-iron:  #9aa1ad;  /* the machine: cold steel     */
+}
+
+/* Rivals-tab panels go dark like the station, scoped by their hooked kids */
+.panel:has(.rv-cast-item), .panel:has(.rv-ladder) {
+  background: linear-gradient(160deg, #17423b, #10302b);
+  border-color: var(--mat-edge); color: var(--chalk);
+}
+.panel:has(.rv-cast-item) h2, .panel:has(.rv-ladder) h2 { color: #fbf7ef; }
+.panel:has(.rv-cast-item) .muted, .panel:has(.rv-ladder) .muted { color: #9fb4ac; }
+.panel:has(.rv-cast-item) .big { color: var(--b-mastered); }
+
+/* shared rival mark: a mono monogram chip keyed to each rival.
+   data-rival lives only on cast items / rungs / taunts, so this is safe. */
+.rv-cast-item::before, .rv-rung::before, .rv-taunt::before {
+  position: absolute; left: 14px; top: 14px;
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-data); font-weight: 700; font-size: 14px; letter-spacing: .02em;
+}
+.rv-taunt::before { top: 50%; transform: translateY(-50%); }
+[data-rival="turbo-tara"]::before      { content: "TT"; background: var(--rv-tara);  color: #2a1206; box-shadow: 0 0 12px rgba(224,102,42,.55); }
+[data-rival="rowan"]::before           { content: "RR"; background: var(--rv-rowan); color: #3a2408; }
+[data-rival="steady-sal"]::before      { content: "SS"; background: var(--rv-sal);   color: #eef4f5; }
+[data-rival="iron-calculator"]::before { content: "IC"; background: var(--rv-iron);  color: #1c2027; box-shadow: inset 0 0 0 1px #cfd4db; }
+
+/* --- cast list --- */
+/* scoped under .list to out-specify the base `.list li` flex/padding rule */
+.list li.rv-cast-item {
+  display: block; position: relative; list-style: none;
+  padding: 14px 4px 16px 66px; border-bottom: 1px solid rgba(255,255,255,.09);
+}
+.list li.rv-cast-item:last-child { border-bottom: 0; }
+.list li.rv-cast-item b { color: #fbf7ef; }
+
+/* --- the ladder: a physical climb, reusing the Board's unlit->glowing ramp --- */
+.rv-ladder { list-style: none; margin: 14px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.rv-rung {
+  position: relative; padding: 15px 96px 15px 66px; border-radius: 10px;
+  color: #9fb4ac; background: var(--mat-edge);
+  box-shadow: inset 0 2px 7px rgba(0,0,0,.45);
+}
+.rv-rung b { color: inherit; }
+.rv-rung::after {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-family: var(--font-data); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+}
+.rv-rung[data-state="locked"] { opacity: .55; }
+.rv-rung[data-state="locked"]::after { content: "Locked"; color: #7f938c; }
+.rv-rung[data-state="current"] {
+  color: #fbf7ef; background: linear-gradient(90deg, rgba(224,102,42,.20), rgba(224,102,42,.05));
+  box-shadow: inset 0 0 0 1px var(--ember), 0 0 16px rgba(224,102,42,.28);
+}
+.rv-rung[data-state="current"]::after { content: "Next up"; color: var(--ember); }
+.rv-rung[data-state="cleared"] {
+  color: #fff; background: linear-gradient(90deg, rgba(246,178,62,.22), rgba(246,178,62,.05));
+  box-shadow: inset 0 0 0 1px rgba(246,178,62,.55);
+}
+.rv-rung[data-state="cleared"]::after { content: "Cleared \2713"; color: var(--b-mastered); }
+
+/* --- race start: fold the taunt into the top of the dark station --- */
+.rv-taunt {
+  position: relative; padding-left: 66px; margin-bottom: 0;
+  background: linear-gradient(160deg, #17423b, #10302b);
+  border-color: var(--mat-edge); color: var(--chalk);
+  border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+}
+.rv-taunt b { color: #fbf7ef; }
+.rv-taunt .muted { color: #9fb4ac; }
+.rv-taunt p:first-of-type { font-family: var(--font-data); font-size: 15px; }
+.rv-taunt + .panel { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* --- race result: the win catches fire; a loss stays calm --- */
+.panel[data-outcome] { color: var(--chalk); border-color: var(--mat-edge); }
+.panel[data-outcome] .big { font-family: var(--font-display); text-transform: uppercase; color: var(--chalk); }
+.panel[data-outcome] .list li { border-bottom-color: rgba(255,255,255,.09); color: #cfe0d9; }
+.panel[data-outcome="loss"], .panel[data-outcome="draw"] { background: linear-gradient(160deg, #17423b, #10302b); }
+.panel[data-outcome="loss"] .big { color: #ffd9c2; }
+.panel[data-outcome="win"] {
+  background: linear-gradient(160deg, #1d5249, #123f37);
+  border-color: rgba(246,178,62,.6);
+  animation: winFlare .55s cubic-bezier(.2,.8,.3,1.1) both;
+}
+.panel[data-outcome="win"] .big {
+  color: var(--b-mastered); text-shadow: 0 0 22px rgba(246,178,62,.55);
+  animation: flareIn .4s cubic-bezier(.2,.8,.3,1.2) both;
+}
+/* winner vs loser at a glance */
+.rv-winner { color: var(--b-mastered) !important; font-weight: 700; }
+.rv-winner b::before { content: "\2605\00a0"; }
+.panel[data-outcome="win"] .list li:not(.rv-winner),
+.panel[data-outcome="loss"] .list li:not(.rv-winner) { opacity: .68; }
+/* ladder cleared = glowing gold banner (distinct from generic .pass) */
+.rv-cleared {
+  display: block; margin-top: 12px; color: #3a2408; font-weight: 700;
+  background: var(--b-mastered); padding: 10px 14px; border-radius: 9px;
+  box-shadow: 0 0 18px rgba(246,178,62,.5);
+}
+@keyframes winFlare {
+  0% { transform: scale(.985); box-shadow: 0 0 0 rgba(246,178,62,0) }
+  100% { transform: scale(1); box-shadow: 0 0 30px rgba(246,178,62,.32) }
+}
+
 /* ---- responsive ----------------------------------------------------- */
 @media (max-width: 560px) {
   header { padding: 10px 14px; }

@@ -11,6 +11,7 @@ window.RIVALS = {
     {
       "id": "turbo-tara",
       "name": "Turbo Tara",
+      "nickname": "Tara",
       "blurb": "Blazing fast, wildly careless — beat her on accuracy.",
       "accuracy": 0.6,
       "speed": 1.5,
@@ -28,6 +29,7 @@ window.RIVALS = {
     {
       "id": "rowan",
       "name": "Rowan the Row-Runner",
+      "nickname": "Rowan",
       "blurb": "Owns the squares diagonal; ordinary everywhere else.",
       "accuracy": 0.75,
       "speed": 3.0,
@@ -47,6 +49,7 @@ window.RIVALS = {
     {
       "id": "steady-sal",
       "name": "Steady Sal",
+      "nickname": "Sal",
       "blurb": "Slow, careful, and almost never wrong.",
       "accuracy": 0.95,
       "speed": 5.0,
@@ -64,6 +67,7 @@ window.RIVALS = {
     {
       "id": "iron-calculator",
       "name": "The Iron Calculator",
+      "nickname": "Iron",
       "blurb": "Perfect and instant. The final boss. Aim to survive.",
       "accuracy": 1.0,
       "speed": 1.0,
