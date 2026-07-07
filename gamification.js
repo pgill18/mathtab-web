@@ -110,6 +110,46 @@ window.GAMIFICATION = {
       }
     },
     {
+      "id": "daily-challenge",
+      "name": "Daily Challenge",
+      "description": "A single goal that rotates every calendar day (distinct from the weekly Quests); complete it for a small XP bonus.",
+      "default": true,
+      "hooks": [
+        "onCorrectAnswer",
+        "onMasteryChange",
+        "onLadderWin",
+        "onDailyFirstPlay"
+      ],
+      "config": {
+        "challenges": [
+          {
+            "id": "daily-sharp",
+            "name": "Sharp Fifteen",
+            "desc": "Answer 15 correct today",
+            "metric": "correct",
+            "target": 15,
+            "reward_xp": 25
+          },
+          {
+            "id": "daily-duel",
+            "name": "Daily Duel",
+            "desc": "Beat one rival today",
+            "metric": "ladder",
+            "target": 1,
+            "reward_xp": 25
+          },
+          {
+            "id": "daily-mastery",
+            "name": "Daily Mastery",
+            "desc": "Master 2 cells today",
+            "metric": "mastered",
+            "target": 2,
+            "reward_xp": 25
+          }
+        ]
+      }
+    },
+    {
       "id": "leaderboard",
       "name": "Local Leaderboard",
       "description": "Ranks the profiles on this device by total XP.",

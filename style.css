@@ -10,6 +10,8 @@
   --ink:    #23201c;   /* body text — warm near-black */
   --spruce: #17423b;   /* structural brand */
   --spruce-2: #1d5249; /* lighter spruce for hovers/edges */
+  --head:   #17423b;   /* heading / accent-number text on paper (split from --spruce
+                          so dark themes can lift it while the header plate stays deep) */
   --ember:  #b8461a;   /* energy accent: CTAs, focus, active */
   --ember-d:#983a15;   /* darker ember for pressed/hover */
   --muted:  #6c6558;   /* warm secondary text */
@@ -18,7 +20,14 @@
   /* the Board is a dark physical training board matted on the chalk card */
   --mat:    #10302b;   /* deep spruce-charcoal — the board itself */
   --mat-edge: #0a231f; /* recessed inner edge */
+  --mat-2:  #123f37;   /* lit-panel dark end (win/toast gradient) */
   --chalk:  #dfe6e2;   /* label ink on the dark board */
+  --chalk-bright: var(--chalk-bright); /* bright text on any dark surface */
+  --chalk-dim:    var(--chalk-dim); /* muted text on any dark surface */
+  /* dark "apparatus" grounds — quiz/rivals/settings stations & the lit win/toast.
+     Built from the tokens above so a theme reskins every station by re-hueing them. */
+  --station:     linear-gradient(160deg, var(--spruce), var(--mat));
+  --station-lit: linear-gradient(160deg, var(--spruce-2), var(--mat-2));
 
   /* mastery ramp — the signature: an UNLIT board that heats up and GLOWS.
      Monotonic brightening (dormant recedes into the mat, mastery pops). */
@@ -38,6 +47,102 @@
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-data: "Cascadia Mono", "Cascadia Code", ui-monospace,
                "SFMono-Regular", "Menlo", monospace;
+}
+
+/* ============ UNLOCKABLE THEMES (task #57) ==========================
+   Each theme is the SAME Training Board world in a different light — an earned
+   "skin", not a random palette. Applied by finn as data-theme on <html>; base =
+   no attribute. Because the roles are tokenised (--head split from --spruce; the
+   dark stations built from --station/--chalk-*), a theme is a pure token override.
+   The Board stays the signature and the mastery ramp stays a monotonic heat-up in
+   every theme; only the ground and hue shift. Verified for contrast in-browser. */
+
+/* --- Night Session: the hall after closing, one warm light. Earned by showing
+   up (daily streak). The grinder's opt-in dark mode — never forced on a beginner.
+   Signature: the Board is the brightest thing in a warm-black room. --- */
+:root[data-theme="night"] {
+  --board: #14120f; --paper: #201d17; --ink: #ece5d7;
+  --head: #f6ecd9; --muted: #a2957f; --line: #34302a;
+  --spruce: #241c15; --spruce-2: #322619;
+  --ember: #d1571f; --ember-d: #b8461a;
+  --mat: #17110b; --mat-edge: #0b0805; --mat-2: #241c15;
+  --chalk: #e8dcc8; --chalk-bright: #fff6e8; --chalk-dim: #b0a48c;
+  --b-unseen: #2c241a; --b-weak: #8a4a26; --b-ok: #c06a24;
+  --b-strong: #e68a2b; --b-mastered: #f6b23e;
+  --good: #57a37b; --bad: #d1571f;
+}
+
+/* --- Forge: molten, triumphant — a blacksmith's heat. Earned by mastering a
+   full row (Row Runner). Signature: the whole room runs as hot as a mastered cell. --- */
+:root[data-theme="forge"] {
+  --board: #17110d; --paper: #251913; --ink: #f1ddca;
+  --head: #ff9d3d; --muted: #b28a6e; --line: #3a271d;
+  --spruce: #3a1a10; --spruce-2: #4a2214;
+  --ember: #ff6a1f; --ember-d: #d1571f;
+  --mat: #1c0f09; --mat-edge: #0e0604; --mat-2: #2a140c;
+  --chalk: #f0d9c0; --chalk-bright: #fff2e2; --chalk-dim: #c49a7f;
+  --b-unseen: #33211a; --b-weak: #9c4a1e; --b-ok: #d46a1a;
+  --b-strong: #ff8a24; --b-mastered: #ffc247;
+  --good: #5aa06a; --bad: #ff6a1f;
+}
+
+/* --- Blueprint: a cool schematic on drafting navy — precision. Earned by a
+   Century quest. Signature: the Board reads as a diagram; warm heat pops on cold
+   ground so the "charge the board" metaphor gets its strongest contrast. --- */
+:root[data-theme="blueprint"] {
+  --board: #0e1626; --paper: #16223c; --ink: #d7e2f2;
+  --head: #74c6e2; --muted: #8598b6; --line: #2b3a5c;
+  --spruce: #12315e; --spruce-2: #1a4278;
+  --ember: #f2a03d; --ember-d: #d9862a;
+  --mat: #0d1a30; --mat-edge: #06101f; --mat-2: #14315c;
+  --chalk: #cfe0f5; --chalk-bright: #eaf3ff; --chalk-dim: #90a6c8;
+  --b-unseen: #1c2b47; --b-weak: #8a5a3a; --b-ok: #c07a34;
+  --b-strong: #e69a3b; --b-mastered: #f6c24e;
+  --good: #3fa8a0; --bad: #f2a03d;
+}
+
+/* --- theme picker (Settings) — finn renders .theme-picker. The card chrome is
+   token-based so the picker looks native in whatever theme is active; each swatch
+   PREVIEW is hardcoded to its own palette (the board "charging" in that light) so
+   every option shows its true colours regardless of the active theme. --- */
+.theme-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px; margin-top: 4px;
+}
+.theme-swatch {
+  display: flex; flex-direction: column; gap: 8px; text-align: left;
+  padding: 10px; border-radius: 12px; cursor: pointer;
+  background: var(--paper); border: 1px solid var(--line); color: var(--ink);
+  transition: border-color .14s, box-shadow .14s, transform .05s;
+}
+.theme-swatch:not(:disabled):hover { border-color: var(--ember); }
+.theme-swatch:not(:disabled):active { transform: translateY(1px); }
+.theme-swatch-preview {
+  position: relative; height: 48px; border-radius: 8px; border: 1px solid var(--line);
+  box-shadow: inset 0 1px 5px rgba(0,0,0,.4);
+  /* default/hall ground → the heat ramp; per-theme overrides below */
+  background: linear-gradient(135deg, #10302b 40%, #e68a2b 76%, #f6b23e);
+}
+.theme-swatch[data-theme="night"]     .theme-swatch-preview { background: linear-gradient(135deg, #17110b 40%, #e68a2b 76%, #f6b23e); }
+.theme-swatch[data-theme="forge"]     .theme-swatch-preview { background: linear-gradient(135deg, #1c0f09 38%, #ff8a24 74%, #ffc247); }
+.theme-swatch[data-theme="blueprint"] .theme-swatch-preview { background: linear-gradient(135deg, #0d1a30 40%, #e69a3b 76%, #f6c24e); }
+.theme-swatch-name {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: .03em;
+  font-size: 14px; font-weight: 700; color: var(--head);
+}
+.theme-lock-hint { font-family: var(--font-data); font-size: 11px; color: var(--muted); }
+/* selected — an ember ring + a check on the name */
+.theme-swatch.is-selected { border-color: var(--ember); box-shadow: 0 0 0 2px var(--ember); }
+.theme-swatch.is-selected .theme-swatch-name::after { content: "\00a0\2713"; color: var(--ember); }
+/* locked — dimmed, desaturated preview stamped "Locked", hint gives the how */
+.theme-swatch[data-locked] { opacity: .82; cursor: not-allowed; }
+/* keep the locked preview's COLOUR (the reward you're working toward — same as the
+   dim-but-visible locked achievement medallions); the scrim + stamp mark it locked. */
+.theme-swatch[data-locked] .theme-swatch-preview::after {
+  content: "Locked"; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-data); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: #fff; background: rgba(0,0,0,.42); border-radius: 8px;
 }
 
 * { box-sizing: border-box; }
@@ -110,7 +215,7 @@ h1 {
   font-family: var(--font-display);
   font-size: 34px; font-weight: 700; letter-spacing: .01em;
   text-transform: uppercase; line-height: 1.05;
-  margin: 6px 0 18px; color: var(--spruce);
+  margin: 6px 0 18px; color: var(--head);
 }
 h2 {
   font-family: var(--font-display);
@@ -174,7 +279,7 @@ nav button:focus-visible, header button:focus-visible, header select:focus-visib
 .big {
   font-family: var(--font-data);
   font-size: 44px; font-weight: 700; letter-spacing: -.01em;
-  color: var(--spruce); line-height: 1;
+  color: var(--head); line-height: 1;
 }
 
 /* ---- scorecard tiles ------------------------------------------------ */
@@ -304,7 +409,7 @@ table.heat tr:nth-child(n+20) { animation-delay: .57s }
 .badge.mastered { background: var(--b-mastered); color: #fff; border-color: transparent; }
 .badge.practicing { background: var(--b-ok); color: #5c3d09; border-color: transparent; }
 code, .code { font-family: var(--font-data); font-size: .95em; }
-.list .code { color: var(--spruce); font-weight: 600; }
+.list .code { color: var(--head); font-weight: 600; }
 
 /* ---- quiz station --------------------------------------------------- */
 /* The quiz is the apparatus you spend the most time on, so it becomes a dark
@@ -312,7 +417,7 @@ code, .code { font-family: var(--font-data); font-size: .95em; }
    sprint, and answers that actually react. Scoped via :has() so only the quiz
    card goes dark; summaries stay on chalk. */
 .panel:has(.quiz-q) {
-  background: linear-gradient(160deg, #17423b, #10302b);
+  background: var(--station);
   border-color: var(--mat-edge); color: var(--chalk);
   padding: 30px 22px 26px;
   box-shadow: inset 0 2px 14px rgba(0,0,0,.4);
@@ -332,7 +437,7 @@ code, .code { font-family: var(--font-data); font-size: .95em; }
 .quiz-q {
   font-family: var(--font-data);
   font-size: 62px; font-weight: 700; text-align: center;
-  margin: 16px 0 12px; color: #fbf7ef; letter-spacing: -.01em;
+  margin: 16px 0 12px; color: var(--chalk-bright); letter-spacing: -.01em;
   text-shadow: 0 0 22px rgba(246,178,62,.25);
 }
 .panel:has(.quiz-q) .quiz-q {
@@ -342,7 +447,7 @@ code, .code { font-family: var(--font-data); font-size: .95em; }
 .quiz-answer input {
   font-family: var(--font-data); font-size: 30px; font-weight: 700;
   width: 180px; text-align: center; padding: 6px 10px;
-  border: 2px solid var(--b-strong); background: #fbf7ef; color: var(--ink);
+  border: 2px solid var(--b-strong); background: var(--chalk-bright); color: var(--ink);
 }
 .quiz-answer input:focus-visible { outline-offset: 0; border-color: var(--b-mastered); }
 
@@ -447,11 +552,11 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 
 /* Rivals-tab panels go dark like the station, scoped by their hooked kids */
 .panel:has(.rv-cast-item), .panel:has(.rv-ladder) {
-  background: linear-gradient(160deg, #17423b, #10302b);
+  background: var(--station);
   border-color: var(--mat-edge); color: var(--chalk);
 }
-.panel:has(.rv-cast-item) h2, .panel:has(.rv-ladder) h2 { color: #fbf7ef; }
-.panel:has(.rv-cast-item) .muted, .panel:has(.rv-ladder) .muted { color: #9fb4ac; }
+.panel:has(.rv-cast-item) h2, .panel:has(.rv-ladder) h2 { color: var(--chalk-bright); }
+.panel:has(.rv-cast-item) .muted, .panel:has(.rv-ladder) .muted { color: var(--chalk-dim); }
 .panel:has(.rv-cast-item) .big { color: var(--b-mastered); }
 
 /* shared rival mark: a mono monogram chip keyed to each rival.
@@ -475,13 +580,13 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   padding: 14px 4px 16px 66px; border-bottom: 1px solid rgba(255,255,255,.09);
 }
 .list li.rv-cast-item:last-child { border-bottom: 0; }
-.list li.rv-cast-item b { color: #fbf7ef; }
+.list li.rv-cast-item b { color: var(--chalk-bright); }
 
 /* --- the ladder: a physical climb, reusing the Board's unlit->glowing ramp --- */
 .rv-ladder { list-style: none; margin: 14px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
 .rv-rung {
   position: relative; padding: 15px 96px 15px 66px; border-radius: 10px;
-  color: #9fb4ac; background: var(--mat-edge);
+  color: var(--chalk-dim); background: var(--mat-edge);
   box-shadow: inset 0 2px 7px rgba(0,0,0,.45);
 }
 .rv-rung b { color: inherit; }
@@ -492,7 +597,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .rv-rung[data-state="locked"] { opacity: .55; }
 .rv-rung[data-state="locked"]::after { content: "Locked"; color: #7f938c; }
 .rv-rung[data-state="current"] {
-  color: #fbf7ef; background: linear-gradient(90deg, rgba(224,102,42,.20), rgba(224,102,42,.05));
+  color: var(--chalk-bright); background: linear-gradient(90deg, rgba(224,102,42,.20), rgba(224,102,42,.05));
   box-shadow: inset 0 0 0 1px var(--ember), 0 0 16px rgba(224,102,42,.28);
 }
 .rv-rung[data-state="current"]::after { content: "Next up"; color: var(--ember); }
@@ -514,12 +619,12 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 /* --- race start: fold the taunt into the top of the dark station --- */
 .rv-taunt {
   position: relative; padding-left: 66px; margin-bottom: 0;
-  background: linear-gradient(160deg, #17423b, #10302b);
+  background: var(--station);
   border-color: var(--mat-edge); color: var(--chalk);
   border-bottom-left-radius: 0; border-bottom-right-radius: 0;
 }
-.rv-taunt b { color: #fbf7ef; }
-.rv-taunt .muted { color: #9fb4ac; }
+.rv-taunt b { color: var(--chalk-bright); }
+.rv-taunt .muted { color: var(--chalk-dim); }
 .rv-taunt p:first-of-type { font-family: var(--font-data); font-size: 15px; }
 .rv-taunt + .panel { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 
@@ -527,10 +632,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .panel[data-outcome] { color: var(--chalk); border-color: var(--mat-edge); }
 .panel[data-outcome] .big { font-family: var(--font-display); text-transform: uppercase; color: var(--chalk); }
 .panel[data-outcome] .list li { border-bottom-color: rgba(255,255,255,.09); color: #cfe0d9; }
-.panel[data-outcome="loss"], .panel[data-outcome="draw"] { background: linear-gradient(160deg, #17423b, #10302b); }
+.panel[data-outcome="loss"], .panel[data-outcome="draw"] { background: var(--station); }
 .panel[data-outcome="loss"] .big { color: #ffd9c2; }
 .panel[data-outcome="win"] {
-  background: linear-gradient(160deg, #1d5249, #123f37);
+  background: var(--station-lit);
   border-color: rgba(246,178,62,.6);
   animation: winFlare .55s cubic-bezier(.2,.8,.3,1.1) both;
 }
@@ -572,7 +677,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .gm-xp-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; }
 .gm-lvl {
   font-family: var(--font-display); font-weight: 700; font-size: 30px;
-  letter-spacing: .02em; color: var(--spruce); line-height: 1;
+  letter-spacing: .02em; color: var(--head); line-height: 1;
 }
 .gm-xp-total { font-family: var(--font-data); font-weight: 700; font-size: 15px; color: var(--ink); }
 
@@ -630,7 +735,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   background: var(--spruce); color: #f3efe6;
 }
 .gm-ranks li:first-child .gm-rank { background: var(--b-mastered); color: #3a2408; }
-.gm-xpv { margin-left: auto; font-family: var(--font-data); font-weight: 700; color: var(--spruce); }
+.gm-xpv { margin-left: auto; font-family: var(--font-data); font-weight: 700; color: var(--head); }
 
 /* the reward MOMENT — a level-up or unlocked badge must light up, not turn up
    silently in a list later. finn renders .gm-toast on unlock; it forges in and
@@ -639,8 +744,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   position: fixed; right: 18px; bottom: 18px; z-index: 50;
   max-width: 330px; display: flex; align-items: center; gap: 12px;
   padding: 14px 18px; border-radius: 12px;
-  background: linear-gradient(160deg, #1d5249, #123f37);
-  border: 1px solid rgba(246,178,62,.6); color: #fbf7ef;
+  background: var(--station-lit);
+  border: 1px solid rgba(246,178,62,.6); color: var(--chalk-bright);
   box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 22px rgba(246,178,62,.25);
   animation: toastIn .4s cubic-bezier(.2,.8,.3,1.15) both;
 }
@@ -674,7 +779,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
    visible where the player is already looking. Reuses the .gm-badge glow/glyph. */
 .gm-earned-badge {
   display: inline-flex; align-items: center; gap: 8px;
-  font-family: var(--font-data); font-size: 13px; font-weight: 700; color: var(--spruce);
+  font-family: var(--font-data); font-size: 13px; font-weight: 700; color: var(--head);
 }
 .gm-earned-badge .gm-badge {
   width: 30px; height: 30px; border-radius: 8px;
@@ -684,26 +789,26 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 /* the recap also rides the DARK race-result station; its note + badge label are
    spruce/muted (tuned for the light summary) and go near-invisible there, so lift
    them to chalk on the dark panel. The gold +XP chip already reads on any ground. */
-.panel[data-outcome] .gm-earned-note { color: #9fb4ac; }
-.panel[data-outcome] .gm-earned-badge { color: #fbf7ef; }
+.panel[data-outcome] .gm-earned-note { color: var(--chalk-dim); }
+.panel[data-outcome] .gm-earned-badge { color: var(--chalk-bright); }
 
 /* ---- Settings ▸ Gamification: a control station, not an admin form ---- */
 /* Scoped to the panel holding the module toggles (only place with [data-mod]).
    The card goes dark like the quiz/rivals apparatus and the native checkboxes
    become forged switch-tracks. */
 .panel:has([data-mod]) {
-  background: linear-gradient(160deg, #17423b, #10302b);
+  background: var(--station);
   border-color: var(--mat-edge); color: var(--chalk);
 }
-.panel:has([data-mod]) h2 { color: #fbf7ef; }
-.panel:has([data-mod]) .muted { color: #9fb4ac; }
+.panel:has([data-mod]) h2 { color: var(--chalk-bright); }
+.panel:has([data-mod]) .muted { color: var(--chalk-dim); }
 .panel:has([data-mod]) .list li {
   display: block; position: relative;
   padding: 15px 74px 15px 2px; border-bottom-color: rgba(255,255,255,.09);
 }
 .panel:has([data-mod]) .list li b {
   font-family: var(--font-display); text-transform: uppercase;
-  letter-spacing: .02em; font-size: 16px; color: #fbf7ef;
+  letter-spacing: .02em; font-size: 16px; color: var(--chalk-bright);
 }
 .panel:has([data-mod]) label.row { display: inline; }
 [data-mod] {

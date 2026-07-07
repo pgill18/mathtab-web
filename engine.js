@@ -362,12 +362,48 @@
         if (st.progress >= q.target) st.done = true;
       }
     },
+    "daily-challenge": function (data, event, payload, cfg) {
+      // Rotates each CALENDAR DAY (vs quests' weekly), keyed off onDailyFirstPlay.
+      // Completing it grants a small XP bonus (only if the XP module is on).
+      const st = gameState(data, "daily-challenge");
+      const challenges = (cfg.config && cfg.config.challenges) || [];
+      if (!challenges.length) return;
+      if (event === "onDailyFirstPlay") {
+        const today = payload.date;
+        if (st.date !== today) {
+          const idx = ((st.index == null ? -1 : st.index) + 1) % challenges.length;
+          st.date = today; st.index = idx; st.progress = 0; st.done = false;
+        }
+        return;
+      }
+      if (st.index == null) { st.date = null; st.index = 0; st.progress = 0; st.done = false; }
+      const c = challenges[st.index];
+      let inc = 0;
+      if (c.metric === "correct" && event === "onCorrectAnswer") inc = 1;
+      else if (c.metric === "mastered" && event === "onMasteryChange" && payload.newBin === "mastered") inc = 1;
+      else if (c.metric === "ladder" && event === "onLadderWin") inc = 1;
+      if (inc && !st.done) {
+        st.progress = (st.progress || 0) + inc;
+        if (st.progress >= c.target) {
+          st.done = true;
+          if (moduleEnabled(data, "xp")) {
+            const xs = gameState(data, "xp");
+            xs.xp = (xs.xp || 0) + (c.reward_xp || 0);
+          }
+        }
+      }
+    },
   };
-  function endSession(data, mode, score, total, n, todayISO) {
+  function beginSession(data, todayISO) {
+    // Daily rollover at session START, before any answers are recorded (#59), so
+    // the day's first session counts toward TODAY's freshly-rotated quest /
+    // daily-challenge instead of being wiped by a rotation at endSession.
     if (data.last_play_date !== todayISO) {
       emit(data, "onDailyFirstPlay", { date: todayISO });
       data.last_play_date = todayISO;
     }
+  }
+  function endSession(data, mode, score, total, n) {
     const acc = n ? score / n : 0;
     emit(data, "onSessionEnd", { mode, score, total, n, accuracy: acc, perfect: n > 0 && score === n });
   }
@@ -465,7 +501,7 @@
     encodeMatch, decodeMatch, decideWinner,
     fnv, rivalById, rivalIsSpecialty, rivalPlay, ladderRank, recordRivalResult,
     setGamification, gameModule, moduleEnabled, gameState, emit, xpLevel,
-    endSession, isoWeek,
+    beginSession, endSession, isoWeek,
     randInt, randCell, randQuestions, sample, shuffle,
   };
 });

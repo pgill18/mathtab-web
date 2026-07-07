@@ -129,6 +129,7 @@
     const results = [];
     let missedAt = null;
     lastFeedback = "";
+    if (opts.user) E.beginSession(opts.user, todayISO()); // daily rollover before the first answer (#59)
     while (true) {
       const q = next(n);
       if (!q) break;
@@ -315,10 +316,11 @@
     host.className = "panel";
     view.appendChild(host);
     try {
+      const gamBefore = opts.user ? gamSnapshot(opts.user) : null;
       const res = await quizLoop(host, next, opts);
       let fx = null;
       if (opts.user) {
-        fx = endSessionFX(opts.user, opts.mode || "session", res.score, res.total, res.n);
+        fx = endSessionFX(opts.user, opts.mode || "session", res.score, res.total, res.n, gamBefore);
         LS.save(opts.user);
       }
       host.innerHTML = summaryPanel(res, earnedHTML(opts.user, fx) + extra(res));
@@ -375,13 +377,14 @@
     host.className = "panel";
     view.innerHTML = `<h1>Practice &mdash; ${esc(l.title)}</h1><p class="panel">${esc(l.explanation)}</p>`;
     view.appendChild(host);
+    const gamBefore = gamSnapshot(u);
     const res = await quizLoop(host, (k) => (k < cells.length ? cells[k] : null), {
       user: u, nameTechnique: true, forceTechnique: id,
       labeler: (k) => `[${k + 1}/${cells.length}]`,
     });
     const acc = res.n ? res.score / res.n : 0;
     const prog = E.applyLessonResult(u, id, acc);
-    const fx = endSessionFX(u, "lesson", res.score, res.total, res.n);
+    const fx = endSessionFX(u, "lesson", res.score, res.total, res.n, gamBefore);
     LS.save(u);
     host.innerHTML = summaryPanel(res, earnedHTML(u, fx) +
       `<p>Lesson progress: <b>${prog.state}</b> (best accuracy ${pct(prog.best_accuracy)}%)</p>`);
@@ -466,6 +469,7 @@
     const host = document.createElement("div");
     host.className = "panel";
     view.appendChild(host);
+    const _before = gamSnapshot(u); // before the whole race so per-answer XP counts too
     const res = await quizLoop(host, (k) => (k < questions.length ? [questions[k][0], questions[k][1]] : null),
       { user: u, labeler: (k) => `vs ${rival.name} — [${k + 1}/${questions.length}]` });
     const rres = E.rivalPlay(rival, questions);
@@ -473,10 +477,11 @@
       rival.name, { score: rres.score, time: rres.time });
     const youWon = w.winner === "you";
     E.recordRivalResult(u, rid, youWon, res.total);
-    const _rewardBefore = gamSnapshot(u); // capture before the win/session emits
     if (youWon) E.emit(u, "onLadderWin", { rivalId: rid, newRank: E.ladderRank(u, RIVALS) });
-    E.endSession(u, "rival", res.score, res.total, res.n, todayISO());
-    fireRewardToasts(_rewardBefore, gamSnapshot(u));
+    E.endSession(u, "rival", res.score, res.total, res.n);
+    const _after = gamSnapshot(u);
+    fireRewardToasts(_before, _after);
+    const rewardFX = rewardDiff(_before, _after);
     LS.save(u);
     const firstOk = rres.timeline.find((t) => t.correct);
     const firstMiss = rres.timeline.find((t) => !t.correct);
@@ -506,6 +511,7 @@
           <li${rivalWinCls}><b>${esc(rival.name)}</b>: ${rres.score}/${questions.length} in ${rres.time}s</li>
         </ul>
         ${ladderMsg}
+        ${earnedHTML(u, rewardFX)}
         <div class="row">
           <button class="primary" id="rvAgain" type="button">Back to Rivals</button>
         </div>
@@ -569,11 +575,8 @@
   }
   // Wrap endSession: snapshot, emit, diff → toasts, and return the XP delta so
   // the summary can show a "+N XP" line right where it was earned.
-  function endSessionFX(u, mode, score, total, n) {
-    const before = gamSnapshot(u);
-    E.endSession(u, mode, score, total, n, todayISO());
-    const after = gamSnapshot(u);
-    fireRewardToasts(before, after);
+  // Diff two snapshots into the recap shape earnedHTML consumes.
+  function rewardDiff(before, after) {
     const badges = ((E.gameModule("achievements") || {}).config || {}).badges || [];
     const newBadges = badges
       .filter((b) => after.badges.has(b.id) && !before.badges.has(b.id))
@@ -583,6 +586,16 @@
       levelBefore: before.level, levelAfter: after.level,
       leveledUp: after.level > before.level, newBadges,
     };
+  }
+  function endSessionFX(u, mode, score, total, n, before) {
+    // `before` should be captured BEFORE the quiz so the delta includes the
+    // per-answer XP (onCorrectAnswer) and any badge/level crossed mid-session,
+    // not only the session-end bonus. Falls back to now if a caller omits it.
+    before = before || gamSnapshot(u);
+    E.endSession(u, mode, score, total, n);
+    const after = gamSnapshot(u);
+    fireRewardToasts(before, after);
+    return rewardDiff(before, after);
   }
   // Reward recap for a drill/lesson/session summary: the "+N XP" chip (when xp
   // is on and delta>0), an optional level-crossing note, then one lit medallion
@@ -628,6 +641,19 @@
         <div class="gm-cap">${prog} / ${q.target} &middot; ${esc(q.desc)}${s.done ? " &#10003;" : ""}</div></div>`);
       } else {
         cells.push(`<div class="gm-quest"><div class="gm-quest-name">Quest</div>
+        <div class="gm-cap">Starts on your next session</div></div>`);
+      }
+    }
+    if (E.moduleEnabled(u, "daily-challenge")) {
+      const s = E.gameState(u, "daily-challenge");
+      const chs = (E.gameModule("daily-challenge").config || {}).challenges || [];
+      if (s.index != null && chs.length) {
+        const c = chs[s.index], prog = s.progress || 0;
+        cells.push(`<div class="gm-quest gm-daily"><div class="gm-quest-name">Daily &mdash; ${esc(c.name)}</div>
+        <div class="gm-bar" style="--p:${Math.min(1, prog / c.target)}"><span></span></div>
+        <div class="gm-cap">${prog} / ${c.target} &middot; ${esc(c.desc)}${s.done ? " &#10003;" : ""}</div></div>`);
+      } else {
+        cells.push(`<div class="gm-quest gm-daily"><div class="gm-quest-name">Daily Challenge</div>
         <div class="gm-cap">Starts on your next session</div></div>`);
       }
     }
@@ -725,9 +751,10 @@
     host.className = "panel";
     view.innerHTML = `<h1>Section challenge</h1><p class="panel">${esc(label)}${note}</p>`;
     view.appendChild(host);
+    const gamBefore = gamSnapshot(u);
     const res = await quizLoop(host, (k) => (k < cells.length ? cells[k] : null),
       { user: u, nameTechnique: true, labeler: (k) => `[${k + 1}/${cells.length}] ${label}` });
-    const fx = endSessionFX(u, "puzzle", res.score, res.total, res.n);
+    const fx = endSessionFX(u, "puzzle", res.score, res.total, res.n, gamBefore);
     LS.save(u);
     const pb = E.passBar(res.score, res.total, res.n);
     const bar = earnedHTML(u, fx)
