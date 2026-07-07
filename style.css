@@ -502,6 +502,15 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 }
 .rv-rung[data-state="cleared"]::after { content: "Cleared \2713"; color: var(--b-mastered); }
 
+/* compact ladder for the Gym dashboard mini-panel — same climbing language,
+   tighter so it reads as a summary beside the heatmap, not the full tab */
+.rv-ladder-mini { gap: 5px; }
+.rv-ladder-mini .rv-rung { padding: 10px 86px 10px 52px; }
+.rv-ladder-mini .rv-rung::before {
+  width: 30px; height: 30px; left: 12px; top: 50%;
+  transform: translateY(-50%); border-radius: 8px; font-size: 11px;
+}
+
 /* --- race start: fold the taunt into the top of the dark station --- */
 .rv-taunt {
   position: relative; padding-left: 66px; margin-bottom: 0;
@@ -545,6 +554,178 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   100% { transform: scale(1); box-shadow: 0 0 30px rgba(246,178,62,.32) }
 }
 
+/* ============ GAMIFICATION — the scorecard & the reward moment ========= */
+/* The Gym's progress panel: XP and quests become real charge-up bars,
+   achievements become forged medallions (locked ones recede, earned ones glow
+   gold like a mastered cell), and the daily streak reuses the top stat-tile so
+   the two streaks read as one family. It stays on chalk — this is dashboard
+   data, not an apparatus. Every fill width comes from an inline --p (0..1) that
+   finn sets on .gm-bar; the glyph per badge is chosen here, keyed by data-badge. */
+.gm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; margin-top: 4px; }
+.gm-xp, .gm-quest, .gm-badges, .gm-board { min-width: 0; }
+.gm-xp { grid-column: 1 / -1; }               /* XP is the headline metric */
+
+.gm-cap {
+  font-family: var(--font-data); font-size: 11px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 7px;
+}
+.gm-xp-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.gm-lvl {
+  font-family: var(--font-display); font-weight: 700; font-size: 30px;
+  letter-spacing: .02em; color: var(--spruce); line-height: 1;
+}
+.gm-xp-total { font-family: var(--font-data); font-weight: 700; font-size: 15px; color: var(--ink); }
+
+/* the charge-up bar — a recessed track that fills ember -> gold */
+.gm-bar {
+  height: 12px; border-radius: 999px; overflow: hidden;
+  background: var(--mat-edge); box-shadow: inset 0 1px 3px rgba(0,0,0,.5);
+}
+.gm-bar > span {
+  display: block; height: 100%; width: calc(var(--p, 0) * 100%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ember), var(--b-mastered));
+  box-shadow: 0 0 10px rgba(246,178,62,.5);
+  transition: width .5s cubic-bezier(.2,.8,.3,1);
+}
+.gm-xp .gm-cap:last-child, .gm-quest .gm-cap:last-child { margin: 8px 0 0; }
+.gm-quest-name {
+  color: var(--ink); text-transform: none; font-size: 12px;
+  font-weight: 600; letter-spacing: .01em; margin-bottom: 7px;
+}
+
+/* daily-streak stat tile — reuses .tile so it matches the top scorecard */
+.gm-streak { border-left-color: var(--ember); margin: 0; }
+
+/* achievements: forged medallions. locked recede into the mat; earned glow. */
+.gm-badge-row { list-style: none; display: flex; gap: 10px; padding: 0; margin: 2px 0 0; flex-wrap: wrap; }
+.gm-badge {
+  width: 46px; height: 46px; border-radius: 12px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--mat-edge); box-shadow: inset 0 1px 4px rgba(0,0,0,.5);
+}
+.gm-badge::before { font-size: 21px; line-height: 1; }
+.gm-badge[data-badge="first-mastery"]::before  { content: "\2605"; } /* first star  */
+.gm-badge[data-badge="row-runner"]::before      { content: "\2630"; } /* a full row  */
+.gm-badge[data-badge="ladder-champion"]::before { content: "\25B2"; } /* top of ladder */
+.gm-badge[data-badge="flawless"]::before         { content: "\25C6"; } /* flawless gem */
+.gm-badge[data-state="locked"]::before { color: #4a6b62; opacity: .55; }
+.gm-badge[data-state="unlocked"] {
+  background: radial-gradient(circle at 50% 36%, #ffd873, var(--b-mastered));
+  box-shadow: 0 0 14px rgba(246,178,62,.55);
+}
+.gm-badge[data-state="unlocked"]::before { color: #3a2408; }
+
+/* leaderboard: a compact ranked ledger, #1 forged gold */
+.gm-ranks { list-style: none; padding: 0; margin: 2px 0 0; }
+.gm-ranks li {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line);
+}
+.gm-ranks li:last-child { border-bottom: 0; }
+.gm-rank {
+  font-family: var(--font-data); font-weight: 700; font-size: 11px;
+  min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--spruce); color: #f3efe6;
+}
+.gm-ranks li:first-child .gm-rank { background: var(--b-mastered); color: #3a2408; }
+.gm-xpv { margin-left: auto; font-family: var(--font-data); font-weight: 700; color: var(--spruce); }
+
+/* the reward MOMENT — a level-up or unlocked badge must light up, not turn up
+   silently in a list later. finn renders .gm-toast on unlock; it forges in and
+   auto-dismisses (add .leaving before removal). This is the ONE bold beat. */
+.gm-toast {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  max-width: 330px; display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; border-radius: 12px;
+  background: linear-gradient(160deg, #1d5249, #123f37);
+  border: 1px solid rgba(246,178,62,.6); color: #fbf7ef;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 22px rgba(246,178,62,.25);
+  animation: toastIn .4s cubic-bezier(.2,.8,.3,1.15) both;
+}
+.gm-toast.leaving { animation: toastOut .3s ease both; }
+.gm-toast b {
+  font-family: var(--font-display); text-transform: uppercase;
+  letter-spacing: .02em; color: var(--b-mastered);
+}
+.gm-toast-glyph {
+  flex: none; width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; font-size: 21px;
+  background: radial-gradient(circle at 50% 36%, #ffd873, var(--b-mastered));
+  color: #3a2408; box-shadow: 0 0 14px rgba(246,178,62,.55);
+}
+@keyframes toastIn  { 0% { opacity: 0; transform: translateY(14px) scale(.96) } 100% { opacity: 1; transform: translateY(0) scale(1) } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(10px) } }
+
+/* summary "what you just earned" — shown on the drill/session summary, right
+   where the accomplishment happened (finn passes the session XP delta in) */
+.gm-earned { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.gm-earned-xp {
+  font-family: var(--font-data); font-weight: 700; font-size: 15px;
+  color: #3a2408; background: var(--b-mastered);
+  padding: 6px 14px; border-radius: 999px;
+  box-shadow: 0 0 16px rgba(246,178,62,.5);
+  animation: flareIn .34s cubic-bezier(.2,.8,.3,1.2) both;
+}
+.gm-earned-note { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+/* the unlock also lands PERMANENTLY on the summary (a 4s corner toast is easy to
+   miss) — a lit medallion + label right beside the +XP, so the achievement is
+   visible where the player is already looking. Reuses the .gm-badge glow/glyph. */
+.gm-earned-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-data); font-size: 13px; font-weight: 700; color: var(--spruce);
+}
+.gm-earned-badge .gm-badge {
+  width: 30px; height: 30px; border-radius: 8px;
+  animation: flareIn .34s cubic-bezier(.2,.8,.3,1.2) both;
+}
+.gm-earned-badge .gm-badge::before { font-size: 15px; }
+/* the recap also rides the DARK race-result station; its note + badge label are
+   spruce/muted (tuned for the light summary) and go near-invisible there, so lift
+   them to chalk on the dark panel. The gold +XP chip already reads on any ground. */
+.panel[data-outcome] .gm-earned-note { color: #9fb4ac; }
+.panel[data-outcome] .gm-earned-badge { color: #fbf7ef; }
+
+/* ---- Settings ▸ Gamification: a control station, not an admin form ---- */
+/* Scoped to the panel holding the module toggles (only place with [data-mod]).
+   The card goes dark like the quiz/rivals apparatus and the native checkboxes
+   become forged switch-tracks. */
+.panel:has([data-mod]) {
+  background: linear-gradient(160deg, #17423b, #10302b);
+  border-color: var(--mat-edge); color: var(--chalk);
+}
+.panel:has([data-mod]) h2 { color: #fbf7ef; }
+.panel:has([data-mod]) .muted { color: #9fb4ac; }
+.panel:has([data-mod]) .list li {
+  display: block; position: relative;
+  padding: 15px 74px 15px 2px; border-bottom-color: rgba(255,255,255,.09);
+}
+.panel:has([data-mod]) .list li b {
+  font-family: var(--font-display); text-transform: uppercase;
+  letter-spacing: .02em; font-size: 16px; color: #fbf7ef;
+}
+.panel:has([data-mod]) label.row { display: inline; }
+[data-mod] {
+  appearance: none; -webkit-appearance: none;
+  position: absolute; top: 14px; right: 4px; margin: 0;
+  width: 52px; height: 28px; border-radius: 999px; cursor: pointer;
+  background: var(--mat-edge); border: 1px solid rgba(255,255,255,.14);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.5);
+  transition: background .18s;
+}
+[data-mod]::before {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #cdd8d2; box-shadow: 0 1px 2px rgba(0,0,0,.4);
+  transition: transform .18s cubic-bezier(.2,.8,.3,1.1), background .18s;
+}
+[data-mod]:checked {
+  background: linear-gradient(90deg, var(--ember), var(--b-mastered));
+  border-color: transparent;
+}
+[data-mod]:checked::before { transform: translateX(24px); background: #fff; }
+
 /* ---- responsive ----------------------------------------------------- */
 @media (max-width: 560px) {
   header { padding: 10px 14px; }
@@ -557,6 +738,9 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   nav button { padding: 9px 12px; font-size: 14px; }
   /* the Board is wider than the phone — show it can be swiped */
   .heatwrap::after { opacity: 1; }
+  /* progress cluster stacks; the reward toast spans the bottom edge */
+  .gm-grid { grid-template-columns: 1fr; }
+  .gm-toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
 
 /* ---- reduced motion ------------------------------------------------- */

@@ -101,6 +101,9 @@
       streak_best: 0,
       lessons: {},          // id -> {state, best_accuracy, attempts}
       rivals: {},           // rival id -> {wins, losses, best_time}
+      settings: {},         // gamification module id -> enabled bool (default from registry)
+      game: {},             // gamification module id -> module state
+      last_play_date: null,  // ISO date of last session (drives onDailyFirstPlay)
       log: [],
     };
   }
@@ -132,6 +135,7 @@
   // nowSec: integer epoch seconds (caller supplies, keeps engine testable).
   function record(data, i, j, correct, rt, nowSec) {
     const c = getCell(data, i, j);
+    const oldBin = masteryBin(c);          // for onMasteryChange (gamification)
     c.attempts += 1;
     if (correct) c.correct += 1;
     c.total_time += rt;
@@ -141,6 +145,10 @@
     data.streak_best = Math.max(data.streak_best || 0, data.streak_current);
     data.log.push({ i, j, correct: !!correct, rt: Math.round(rt * 100) / 100, t: nowSec });
     if (data.log.length > 2000) data.log = data.log.slice(-2000);
+    // gamification events (no-ops if registry unset or all modules off)
+    if (correct) emit(data, "onCorrectAnswer", { i, j, rt });
+    const newBin = masteryBin(c);
+    if (newBin !== oldBin) emit(data, "onMasteryChange", { i, j, newBin });
   }
 
   // ---- Weakest cells (mirrors tables.py weakest_cells) --------------------
@@ -255,6 +263,115 @@
   }
 
   // Winner decision (mirrors race status: higher score, tie-break faster time)
+  // ---- Gamification (Phase 5) — mirror of tables.py -----------------------
+  // Registry is injected by app.js (setGamification(window.GAMIFICATION)); left
+  // null, emit() is a graceful no-op (keeps engine loadable/testable standalone).
+  let _gami = null;
+  function setGamification(reg) { _gami = reg; }
+  function gameModule(mid) { return _gami ? _gami.modules.find((m) => m.id === mid) : null; }
+  function moduleEnabled(data, mid) {
+    if (data.settings && Object.prototype.hasOwnProperty.call(data.settings, mid)) {
+      return !!data.settings[mid];
+    }
+    const m = gameModule(mid);
+    return m ? !!m.default : false;
+  }
+  function gameState(data, mid) {
+    if (!data.game) data.game = {};
+    if (!data.game[mid]) data.game[mid] = {};
+    return data.game[mid];
+  }
+  function emit(data, event, payload) {
+    if (!_gami) return;
+    for (const m of _gami.modules) {
+      if (!(m.hooks || []).includes(event)) continue;
+      if (!moduleEnabled(data, m.id)) continue;
+      const h = GAME_HANDLERS[m.id];
+      if (h) h(data, event, payload, m);
+    }
+  }
+  function xpLevel(xp) { return 1 + Math.floor(xp / 100); }
+  function rowFullyMastered(data, n) {
+    return grid().every((j) => masteryBin(peekCell(data, n, j)) === "mastered");
+  }
+  function isoWeek(iso) {
+    const d = new Date(iso + "T00:00:00Z");
+    const day = (d.getUTCDay() + 6) % 7;         // Mon=0
+    d.setUTCDate(d.getUTCDate() - day + 3);       // nearest Thursday
+    const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const week = 1 + Math.round(((d - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+    return d.getUTCFullYear() + "-W" + String(week).padStart(2, "0");
+  }
+  const GAME_HANDLERS = {
+    xp: function (data, event, payload) {
+      const st = gameState(data, "xp");
+      if (st.xp == null) st.xp = 0;
+      if (event === "onCorrectAnswer") st.xp += 5;
+      else if (event === "onSessionEnd") st.xp += 10 + Math.round((payload.accuracy || 0) * 10);
+      else if (event === "onLadderWin") st.xp += 50;
+    },
+    achievements: function (data, event, payload, cfg) {
+      const st = gameState(data, "achievements");
+      if (!st.unlocked) st.unlocked = [];
+      for (const b of (cfg.config && cfg.config.badges) || []) {
+        if (st.unlocked.includes(b.id) || b.event !== event) continue;
+        let hit = false;
+        if (b.check === "mastered_cell") hit = payload.newBin === "mastered";
+        else if (b.check === "full_row") hit = payload.newBin === "mastered" && rowFullyMastered(data, payload.i);
+        else if (b.check === "ladder_champion") {
+          const rivals = (typeof window !== "undefined" && window.RIVALS) ? window.RIVALS : null;
+          hit = rivals ? (payload.newRank || 0) >= rivals.ladder.length : false;
+        }
+        else if (b.check === "perfect_drill") hit = payload.mode === "drill" && payload.perfect;
+        if (hit) st.unlocked.push(b.id);
+      }
+    },
+    "daily-streak": function (data, event, payload) {
+      if (event !== "onDailyFirstPlay") return;
+      const st = gameState(data, "daily-streak");
+      const last = st.last_date, today = payload.date;
+      if (last == null) st.current = 1;
+      else {
+        const gap = Math.round((new Date(today + "T00:00:00Z") - new Date(last + "T00:00:00Z")) / 86400000);
+        if (gap === 1) st.current = (st.current || 0) + 1;
+        else if (gap !== 0) st.current = 1;
+      }
+      st.last_date = today;
+      st.best = Math.max(st.best || 0, st.current || 0);
+    },
+    quests: function (data, event, payload, cfg) {
+      const st = gameState(data, "quests");
+      const quests = (cfg.config && cfg.config.quests) || [];
+      if (!quests.length) return;
+      if (event === "onDailyFirstPlay") {
+        const wk = isoWeek(payload.date);
+        if (st.week !== wk) {
+          const idx = ((st.index == null ? -1 : st.index) + 1) % quests.length;
+          st.week = wk; st.index = idx; st.progress = 0; st.done = false;
+        }
+        return;
+      }
+      if (st.index == null) { st.week = null; st.index = 0; st.progress = 0; st.done = false; }
+      const q = quests[st.index];
+      let inc = 0;
+      if (q.metric === "correct" && event === "onCorrectAnswer") inc = 1;
+      else if (q.metric === "mastered" && event === "onMasteryChange" && payload.newBin === "mastered") inc = 1;
+      else if (q.metric === "ladder" && event === "onLadderWin") inc = 1;
+      if (inc && !st.done) {
+        st.progress = (st.progress || 0) + inc;
+        if (st.progress >= q.target) st.done = true;
+      }
+    },
+  };
+  function endSession(data, mode, score, total, n, todayISO) {
+    if (data.last_play_date !== todayISO) {
+      emit(data, "onDailyFirstPlay", { date: todayISO });
+      data.last_play_date = todayISO;
+    }
+    const acc = n ? score / n : 0;
+    emit(data, "onSessionEnd", { mode, score, total, n, accuracy: acc, perfect: n > 0 && score === n });
+  }
+
   // ---- AI rivals (Phase 4) ----------------------------------------------
   // Deterministic bots; identical FNV-1a model to tables.py so a rival + a
   // fixed question set always behave the same (no wall-clock/Math.random).
@@ -347,6 +464,8 @@
     applyLessonResult, overallMastery, rowCells, diagonalCells, blockCells,
     encodeMatch, decodeMatch, decideWinner,
     fnv, rivalById, rivalIsSpecialty, rivalPlay, ladderRank, recordRivalResult,
+    setGamification, gameModule, moduleEnabled, gameState, emit, xpLevel,
+    endSession, isoWeek,
     randInt, randCell, randQuestions, sample, shuffle,
   };
 });

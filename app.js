@@ -7,6 +7,9 @@
   const E = window.Engine;
   const LESSONS = window.LESSONS;
   const RIVALS = window.RIVALS;
+  const GAMIFICATION = window.GAMIFICATION;
+  if (GAMIFICATION) E.setGamification(GAMIFICATION);
+  const todayISO = () => new Date().toISOString().slice(0, 10);
   const $ = (sel, el = document) => el.querySelector(sel);
   const view = $("#view");
 
@@ -225,7 +228,8 @@
       </div>
       <div class="panel"><h2>Lesson progress</h2><ul class="list">${lessonList}</ul></div>
       <div class="panel"><h2>Top 10 weakest cells</h2><ul class="list">${weakList}</ul></div>
-      ${rivalsStandingsHTML(u)}`;
+      ${rivalsStandingsHTML(u)}
+      ${gamGymHTML(u)}`;
   };
 
   views.play = function () {
@@ -266,12 +270,12 @@
         next = () => (Date.now() < timerDeadline ? E.randCell() : null);
         labeler = (n) => `[${n + 1}]  keep going until time runs out`;
       }
-      runAndSummarize(u, next, { user: u, labeler, timerDeadline }, () => "");
+      runAndSummarize(u, next, { user: u, mode: "drill", labeler, timerDeadline }, () => "");
     };
     $("#startSurv").onclick = () => {
       const u = activeUser();
       runAndSummarize(u, () => E.randCell(), {
-        user: u, stopOnMiss: true, labeler: (n) => `streak ${n}`,
+        user: u, mode: "survival", stopOnMiss: true, labeler: (n) => `streak ${n}`,
       }, (res) => res.missedAt
         ? `<p>Survival streak: <b>${res.score}</b> (missed on ${res.missedAt[0]}×${res.missedAt[1]}). Best ever: ${u.streak_best}.</p>`
         : "");
@@ -282,7 +286,7 @@
       const u = activeUser();
       const cells = E.rowCells(n);
       runAndSummarize(u, (k) => (k < cells.length ? cells[k] : null),
-        { user: u, labeler: (k) => `[${k + 1}/${cells.length}]  the ${n} row` }, () => "");
+        { user: u, mode: "tablerun", labeler: (k) => `[${k + 1}/${cells.length}]  the ${n} row` }, () => "");
     };
   };
 
@@ -312,8 +316,12 @@
     view.appendChild(host);
     try {
       const res = await quizLoop(host, next, opts);
-      if (opts.user) LS.save(opts.user);
-      host.innerHTML = summaryPanel(res, extra(res));
+      let fx = null;
+      if (opts.user) {
+        fx = endSessionFX(opts.user, opts.mode || "session", res.score, res.total, res.n);
+        LS.save(opts.user);
+      }
+      host.innerHTML = summaryPanel(res, earnedHTML(opts.user, fx) + extra(res));
       $("#doneBtn", host).onclick = () => render();
     } finally {
       if (timer) clearInterval(timer);
@@ -373,8 +381,9 @@
     });
     const acc = res.n ? res.score / res.n : 0;
     const prog = E.applyLessonResult(u, id, acc);
+    const fx = endSessionFX(u, "lesson", res.score, res.total, res.n);
     LS.save(u);
-    host.innerHTML = summaryPanel(res,
+    host.innerHTML = summaryPanel(res, earnedHTML(u, fx) +
       `<p>Lesson progress: <b>${prog.state}</b> (best accuracy ${pct(prog.best_accuracy)}%)</p>`);
     $("#doneBtn", host).onclick = () => views.lessons();
   }
@@ -388,17 +397,21 @@
   }
 
   // Gym dashboard section (called from views.gym).
+  // Gym mini-panel: same rung builder as views.rivals (hardest&rarr;easiest,
+  // data-state cleared/current/locked) so it reads as one world; the
+  // .rv-ladder-mini modifier keeps it compact for the dashboard.
   function rivalsStandingsHTML(u) {
     const rank = E.ladderRank(u, RIVALS);
     const champ = rank >= RIVALS.ladder.length ? " &mdash; CHAMPION!" : "";
-    const rows = RIVALS.ladder.map((rid, idx) => {
-      const r = E.rivalById(RIVALS, rid);
-      const state = idx < rank ? "beaten" : idx === rank ? "next up" : "locked";
-      return `<li><span class="badge ${idx < rank ? "mastered" : ""}">${state}</span> `
-        + `<b>${esc(r.name)}</b> &mdash; ${rivalStanding(u, rid)}</li>`;
-    }).join("");
+    const rungs = RIVALS.ladder.map((rid, idx) => ({ rid, idx })).reverse()
+      .map(({ rid, idx }) => {
+        const r = E.rivalById(RIVALS, rid);
+        const state = idx < rank ? "cleared" : idx === rank ? "current" : "locked";
+        return `<li class="rv-rung" data-rival="${esc(rid)}" data-state="${state}">`
+          + `<b>${esc(r.name)}</b> &mdash; ${rivalStanding(u, rid)}</li>`;
+      }).join("");
     return `<div class="panel"><h2>Rivals &amp; ladder (rank ${rank}/${RIVALS.ladder.length}${champ})</h2>
-      <ul class="list">${rows}</ul></div>`;
+      <ol class="rv-ladder rv-ladder-mini">${rungs}</ol></div>`;
   }
 
   views.rivals = function () {
@@ -460,6 +473,10 @@
       rival.name, { score: rres.score, time: rres.time });
     const youWon = w.winner === "you";
     E.recordRivalResult(u, rid, youWon, res.total);
+    const _rewardBefore = gamSnapshot(u); // capture before the win/session emits
+    if (youWon) E.emit(u, "onLadderWin", { rivalId: rid, newRank: E.ladderRank(u, RIVALS) });
+    E.endSession(u, "rival", res.score, res.total, res.n, todayISO());
+    fireRewardToasts(_rewardBefore, gamSnapshot(u));
     LS.save(u);
     const firstOk = rres.timeline.find((t) => t.correct);
     const firstMiss = rres.timeline.find((t) => !t.correct);
@@ -496,6 +513,165 @@
     $("#rvAgain").onclick = () => views.rivals();
   }
 
+  // ---- Gamification UI (Phase 5) ----------------------------------------
+  // Local leaderboard: every profile on this device, ranked by total XP.
+  function readLeaderboard() {
+    const rows = LS.profiles().map((name) => {
+      const d = LS.load(name);
+      const xp = (d.game && d.game.xp && d.game.xp.xp) || 0;
+      return [name, xp];
+    });
+    rows.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+    return rows;
+  }
+
+  // ---- Reward moment (level-ups & badge unlocks) ------------------------
+  // theo's medallion glyphs, reused for the toast so the beat matches the badge.
+  const BADGE_GLYPH = {
+    "first-mastery": "★", "row-runner": "☰",
+    "ladder-champion": "▲", "flawless": "◆",
+  };
+  // Snapshot the reward-bearing state BEFORE emits so we can diff AFTER.
+  function gamSnapshot(u) {
+    const xp = E.gameState(u, "xp").xp || 0;
+    const un = E.gameState(u, "achievements").unlocked || [];
+    return { xp, level: E.xpLevel(xp), badges: new Set(un) };
+  }
+  const _toasts = [];
+  function layoutToasts() { _toasts.forEach((el, i) => { el.style.bottom = (18 + i * 76) + "px"; }); }
+  function showToast(glyph, title, detail) {
+    const el = document.createElement("div");
+    el.className = "gm-toast";
+    el.setAttribute("role", "status");
+    el.innerHTML = `<span class="gm-toast-glyph">${glyph}</span><div><b>${esc(title)}</b><br>${esc(detail)}</div>`;
+    document.body.appendChild(el);
+    _toasts.push(el);
+    layoutToasts();
+    setTimeout(() => {
+      el.classList.add("leaving");
+      setTimeout(() => {
+        el.remove();
+        const i = _toasts.indexOf(el);
+        if (i >= 0) _toasts.splice(i, 1);
+        layoutToasts();
+      }, 300);
+    }, 6000);
+  }
+  // Diff two snapshots and fire one toast per newly-crossed level / new badge.
+  function fireRewardToasts(before, after) {
+    for (let L = before.level + 1; L <= after.level; L++)
+      showToast("★", `Level ${L}!`, `You reached Level ${L}`);
+    const badges = ((E.gameModule("achievements") || {}).config || {}).badges || [];
+    for (const b of badges) {
+      if (after.badges.has(b.id) && !before.badges.has(b.id))
+        showToast(BADGE_GLYPH[b.id] || "★", "Achievement unlocked", `${b.name} — ${b.desc}`);
+    }
+  }
+  // Wrap endSession: snapshot, emit, diff → toasts, and return the XP delta so
+  // the summary can show a "+N XP" line right where it was earned.
+  function endSessionFX(u, mode, score, total, n) {
+    const before = gamSnapshot(u);
+    E.endSession(u, mode, score, total, n, todayISO());
+    const after = gamSnapshot(u);
+    fireRewardToasts(before, after);
+    const badges = ((E.gameModule("achievements") || {}).config || {}).badges || [];
+    const newBadges = badges
+      .filter((b) => after.badges.has(b.id) && !before.badges.has(b.id))
+      .map((b) => ({ id: b.id, name: b.name }));
+    return {
+      xpDelta: after.xp - before.xp,
+      levelBefore: before.level, levelAfter: after.level,
+      leveledUp: after.level > before.level, newBadges,
+    };
+  }
+  // Reward recap for a drill/lesson/session summary: the "+N XP" chip (when xp
+  // is on and delta>0), an optional level-crossing note, then one lit medallion
+  // per newly-unlocked badge so the unlock is stated where the player is looking.
+  function earnedHTML(u, fx) {
+    if (!u || !fx) return "";
+    const showXp = E.moduleEnabled(u, "xp") && fx.xpDelta > 0;
+    const newBadges = fx.newBadges || [];
+    if (!showXp && !newBadges.length) return "";
+    let inner = "";
+    if (showXp) {
+      inner += `<span class="gm-earned-xp">+${fx.xpDelta} XP</span>`;
+      if (fx.leveledUp) inner += `<span class="gm-earned-note">Level ${fx.levelBefore} &rarr; ${fx.levelAfter}</span>`;
+    }
+    for (const b of newBadges)
+      inner += `<span class="gm-earned-badge"><span class="gm-badge" data-badge="${esc(b.id)}" data-state="unlocked"></span> ${esc(b.name)} unlocked</span>`;
+    return `<div class="gm-earned">${inner}</div>`;
+  }
+
+  // Gym "Rewards" panel — only ENABLED modules render (mirrors CLI). Emits
+  // theo's gm-grid hooks; bar widths come solely from the inline --p (0..1).
+  function gamGymHTML(u) {
+    if (!GAMIFICATION) return "";
+    const cells = [];
+    if (E.moduleEnabled(u, "xp")) {
+      const xp = E.gameState(u, "xp").xp || 0;
+      const lvl = E.xpLevel(xp), into = xp % 100;
+      cells.push(`<div class="gm-xp"><div class="gm-xp-head"><span class="gm-lvl">L${lvl}</span> <span class="gm-xp-total">${xp} XP</span></div>
+        <div class="gm-bar" style="--p:${into / 100}"><span></span></div>
+        <div class="gm-cap">${into} / 100 to Level ${lvl + 1}</div></div>`);
+    }
+    if (E.moduleEnabled(u, "daily-streak")) {
+      const s = E.gameState(u, "daily-streak");
+      cells.push(`<div class="tile gm-streak"><div class="k">Daily streak</div><div class="v">${s.current || 0}</div><div class="muted">best ${s.best || 0}</div></div>`);
+    }
+    if (E.moduleEnabled(u, "quests")) {
+      const s = E.gameState(u, "quests");
+      const qs = (E.gameModule("quests").config || {}).quests || [];
+      if (s.index != null && qs.length) {
+        const q = qs[s.index], prog = s.progress || 0;
+        cells.push(`<div class="gm-quest"><div class="gm-quest-name">Quest &mdash; ${esc(q.name)}</div>
+        <div class="gm-bar" style="--p:${Math.min(1, prog / q.target)}"><span></span></div>
+        <div class="gm-cap">${prog} / ${q.target} &middot; ${esc(q.desc)}${s.done ? " &#10003;" : ""}</div></div>`);
+      } else {
+        cells.push(`<div class="gm-quest"><div class="gm-quest-name">Quest</div>
+        <div class="gm-cap">Starts on your next session</div></div>`);
+      }
+    }
+    if (E.moduleEnabled(u, "achievements")) {
+      const un = E.gameState(u, "achievements").unlocked || [];
+      const bs = (E.gameModule("achievements").config || {}).badges || [];
+      const lis = bs.map((b) =>
+        `<li class="gm-badge" data-badge="${esc(b.id)}" data-state="${un.includes(b.id) ? "unlocked" : "locked"}" title="${esc(b.name + " — " + b.desc)}"></li>`).join("");
+      cells.push(`<div class="gm-badges"><div class="gm-cap">Achievements ${un.length}/${bs.length}</div>
+        <ul class="gm-badge-row">${lis}</ul></div>`);
+    }
+    if (E.moduleEnabled(u, "leaderboard")) {
+      const bd = readLeaderboard().slice(0, 5);
+      const lis = bd.length
+        ? bd.map(([n, x], i) => `<li><span class="gm-rank">${i + 1}</span> ${esc(n)} <span class="gm-xpv">${x}</span></li>`).join("")
+        : `<li class="muted">No profiles yet</li>`;
+      cells.push(`<div class="gm-board"><div class="gm-cap">Leaderboard</div>
+        <ol class="gm-ranks">${lis}</ol></div>`);
+    }
+    if (!cells.length) return "";
+    return `<div class="panel gm-panel"><h2>Rewards</h2>
+      <div class="gm-grid">${cells.join("")}</div></div>`;
+  }
+
+  // Settings view — GENERATED from the registry; a new module appears here
+  // automatically with no per-module UI code.
+  views.settings = function () {
+    const u = activeUser();
+    const rows = (GAMIFICATION ? GAMIFICATION.modules : []).map((m) => {
+      const on = E.moduleEnabled(u, m.id);
+      return `<li><label class="row"><input type="checkbox" data-mod="${esc(m.id)}" ${on ? "checked" : ""}> <b>${esc(m.name)}</b></label>
+        <br><span class="muted">${esc(m.description)}</span></li>`;
+    }).join("");
+    view.innerHTML = `<h1>Settings</h1>
+      <div class="panel"><h2>Gamification</h2>
+        <p class="muted">Turn modules on or off. Off means no XP/badges and hidden from the Gym.</p>
+        <ul class="list">${rows}</ul></div>`;
+    view.querySelectorAll("[data-mod]").forEach((cb) => cb.onchange = () => {
+      const cur = activeUser();
+      cur.settings[cb.getAttribute("data-mod")] = cb.checked;
+      LS.save(cur);
+    });
+  };
+
   views.puzzles = function () {
     view.innerHTML = `<h1>Puzzles</h1>
       <div class="panel">
@@ -524,7 +700,7 @@
       const cells = E.weakestCells(u, E.PUZZLE_WEAK_COUNT);
       if (!cells.length) { alert("No recorded cells yet. Play Drill or Tablerun first."); return; }
       runAndSummarize(u, (k) => (k < cells.length ? cells[k] : null),
-        { user: u, nameTechnique: true, labeler: (k) => `[${k + 1}/${cells.length}] weakest cells` }, () => "");
+        { user: u, mode: "puzzle", nameTechnique: true, labeler: (k) => `[${k + 1}/${cells.length}] weakest cells` }, () => "");
     };
     $("#pRow").onclick = () => {
       const n = parseInt($("#pRowN").value, 10);
@@ -551,9 +727,11 @@
     view.appendChild(host);
     const res = await quizLoop(host, (k) => (k < cells.length ? cells[k] : null),
       { user: u, nameTechnique: true, labeler: (k) => `[${k + 1}/${cells.length}] ${label}` });
+    const fx = endSessionFX(u, "puzzle", res.score, res.total, res.n);
     LS.save(u);
     const pb = E.passBar(res.score, res.total, res.n);
-    const bar = `<p>Accuracy ${pct(pb.accuracy)}% (need &ge;${pct(pb.needAccuracy)}%) ${pb.okAccuracy ? "OK" : "MISS"}<br>`
+    const bar = earnedHTML(u, fx)
+      + `<p>Accuracy ${pct(pb.accuracy)}% (need &ge;${pct(pb.needAccuracy)}%) ${pb.okAccuracy ? "OK" : "MISS"}<br>`
       + `Avg time ${pb.avgTime.toFixed(1)}s (need &lt;${pb.needTime}s) ${pb.okTime ? "OK" : "MISS"}</p>`
       + `<p class="${pb.passed ? "pass" : "fail"}">RESULT: ${pb.passed ? "PASS" : "FAIL"}</p>`;
     host.innerHTML = summaryPanel(res, bar);
