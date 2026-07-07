@@ -4,7 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Times Table Gym</title>
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
+  <script>
+    /* Pre-paint theme bootstrap: apply the active profile's saved theme before
+       first paint so there's no flash of the base look. Base "hall" = no attr. */
+    (function () {
+      try {
+        var a = localStorage.getItem("ttg.active") || "";
+        var t = localStorage.getItem("ttg.theme." + a) || "hall";
+        if (t && t !== "hall") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header>
@@ -33,10 +44,10 @@
     <span>Full 2&ndash;25 grid. Data stays in this browser (localStorage), one profile at a time.</span>
   </footer>
 
-  <script src="lessons.js?v=20"></script>
-  <script src="rivals.js?v=20"></script>
-  <script src="gamification.js?v=20"></script>
-  <script src="engine.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="lessons.js?v=21"></script>
+  <script src="rivals.js?v=21"></script>
+  <script src="gamification.js?v=21"></script>
+  <script src="engine.js?v=21"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

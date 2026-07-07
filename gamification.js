@@ -155,6 +155,21 @@ window.GAMIFICATION = {
       "description": "Ranks the profiles on this device by total XP.",
       "default": true,
       "hooks": []
+    },
+    {
+      "id": "unlockable-themes",
+      "name": "Unlockable Themes",
+      "description": "Unlock alternate visual themes by hitting gamification milestones, then pick one in Settings (webapp only).",
+      "default": true,
+      "hooks": [],
+      "config": {
+        "themes": [
+          { "id": "hall", "name": "Training Hall", "unlock": null },
+          { "id": "night", "name": "Night Session", "unlock": { "type": "streak", "days": 7 }, "hint": "Unlock: 7-day streak" },
+          { "id": "forge", "name": "Forge", "unlock": { "type": "badge", "id": "row-runner" }, "hint": "Unlock: master a full row" },
+          { "id": "blueprint", "name": "Blueprint", "unlock": { "type": "badge", "id": "flawless" }, "hint": "Unlock: finish a drill at 100%" }
+        ]
+      }
     }
   ]
 };

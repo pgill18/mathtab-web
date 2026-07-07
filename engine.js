@@ -291,6 +291,15 @@
     }
   }
   function xpLevel(xp) { return 1 + Math.floor(xp / 100); }
+  // Pure read-only predicate for the unlockable-themes module: is a theme's
+  // `unlock` satisfied by EXISTING gamification state? (webapp visual gating;
+  // no CLI counterpart.) unlock:null => always available (the base look).
+  function themeUnlocked(data, unlock) {
+    if (!unlock) return true;
+    if (unlock.type === "streak") return (gameState(data, "daily-streak").best || 0) >= unlock.days;
+    if (unlock.type === "badge") return (gameState(data, "achievements").unlocked || []).includes(unlock.id);
+    return false;
+  }
   function rowFullyMastered(data, n) {
     return grid().every((j) => masteryBin(peekCell(data, n, j)) === "mastered");
   }
@@ -500,7 +509,7 @@
     applyLessonResult, overallMastery, rowCells, diagonalCells, blockCells,
     encodeMatch, decodeMatch, decideWinner,
     fnv, rivalById, rivalIsSpecialty, rivalPlay, ladderRank, recordRivalResult,
-    setGamification, gameModule, moduleEnabled, gameState, emit, xpLevel,
+    setGamification, gameModule, moduleEnabled, gameState, emit, xpLevel, themeUnlocked,
     beginSession, endSession, isoWeek,
     randInt, randCell, randQuestions, sample, shuffle,
   };

@@ -23,6 +23,8 @@
     setProfiles(a) { localStorage.setItem("ttg.profiles", JSON.stringify(a)); },
     active() { return localStorage.getItem("ttg.active") || ""; },
     setActive(n) { localStorage.setItem("ttg.active", n); },
+    theme(n) { return localStorage.getItem("ttg.theme." + n) || "hall"; },   // per-profile selected theme
+    setTheme(n, id) { localStorage.setItem("ttg.theme." + n, id); },
     key(n) { return "ttg.user." + n; },
     load(n) {
       let d = null;
@@ -680,6 +682,35 @@
 
   // Settings view — GENERATED from the registry; a new module appears here
   // automatically with no per-module UI code.
+  // Apply the given theme to <html> (base "hall" = no attribute). Mirrors the
+  // pre-paint bootstrap in index.html so in-app switches take effect instantly.
+  function applyTheme(id) {
+    if (!id || id === "hall") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = id;
+  }
+
+  // Registry-generated theme picker (unlockable-themes module). Locked themes are
+  // shown but disabled with their unlock hint; unlock state is a pure read over
+  // existing gamification state (E.themeUnlocked). theo styles these hooks.
+  function themePickerHTML(u) {
+    if (!E.moduleEnabled(u, "unlockable-themes")) return "";
+    const themes = ((E.gameModule("unlockable-themes") || {}).config || {}).themes || [];
+    if (!themes.length) return "";
+    const active = LS.theme(u.user);
+    const items = themes.map((th) => {
+      const unlocked = E.themeUnlocked(u, th.unlock);
+      const selected = th.id === active || (!active && th.id === "hall");
+      const hint = (!unlocked && th.hint) ? `<span class="theme-lock-hint">${esc(th.hint)}</span>` : "";
+      return `<button type="button" class="theme-swatch${selected ? " is-selected" : ""}" data-theme="${esc(th.id)}"`
+        + `${unlocked ? "" : " data-locked disabled"} aria-pressed="${selected ? "true" : "false"}">`
+        + `<span class="theme-swatch-preview" aria-hidden="true"></span>`
+        + `<span class="theme-swatch-name">${esc(th.name)}</span>${hint}</button>`;
+    }).join("");
+    return `<div class="panel theme-picker"><h2>Themes</h2>
+      <p class="muted">Unlock alternate looks by hitting milestones; pick any you've unlocked.</p>
+      <div class="theme-grid">${items}</div></div>`;
+  }
+
   views.settings = function () {
     const u = activeUser();
     const rows = (GAMIFICATION ? GAMIFICATION.modules : []).map((m) => {
@@ -690,11 +721,19 @@
     view.innerHTML = `<h1>Settings</h1>
       <div class="panel"><h2>Gamification</h2>
         <p class="muted">Turn modules on or off. Off means no XP/badges and hidden from the Gym.</p>
-        <ul class="list">${rows}</ul></div>`;
+        <ul class="list">${rows}</ul></div>
+      ${themePickerHTML(u)}`;
     view.querySelectorAll("[data-mod]").forEach((cb) => cb.onchange = () => {
       const cur = activeUser();
       cur.settings[cb.getAttribute("data-mod")] = cb.checked;
       LS.save(cur);
+      views.settings(); // toggling unlockable-themes shows/hides the picker
+    });
+    view.querySelectorAll(".theme-swatch:not([disabled])").forEach((b) => b.onclick = () => {
+      const id = b.getAttribute("data-theme");
+      LS.setTheme(u.user, id);
+      applyTheme(id);
+      views.settings(); // refresh selected state
     });
   };
 
@@ -915,6 +954,7 @@
   let currentView = "gym";
 
   function render() {
+    applyTheme(LS.theme(LS.active())); // keep <html> theme in sync with the active profile
     document.querySelectorAll("#nav button").forEach((b) =>
       b.classList.toggle("active", b.dataset.view === currentView));
     (views[currentView] || views.gym)();
