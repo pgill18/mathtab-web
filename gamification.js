@@ -165,8 +165,8 @@ window.GAMIFICATION = {
       "config": {
         "themes": [
           { "id": "hall", "name": "Training Hall", "unlock": null },
-          { "id": "night", "name": "Night Session", "unlock": { "type": "streak", "days": 7 }, "hint": "Unlock: 7-day streak" },
-          { "id": "forge", "name": "Forge", "unlock": { "type": "badge", "id": "row-runner" }, "hint": "Unlock: master a full row" },
+          { "id": "night", "name": "Night Session", "unlock": { "type": "answer_streak", "n": 15 }, "hint": "Unlock: 15 correct in a row" },
+          { "id": "forge", "name": "Forge", "unlock": { "type": "level", "min": 3 }, "hint": "Unlock: reach Level 3" },
           { "id": "blueprint", "name": "Blueprint", "unlock": { "type": "badge", "id": "flawless" }, "hint": "Unlock: finish a drill at 100%" }
         ]
       }

@@ -700,7 +700,17 @@
     const items = themes.map((th) => {
       const unlocked = E.themeUnlocked(u, th.unlock);
       const selected = th.id === active || (!active && th.id === "hall");
-      const hint = (!unlocked && th.hint) ? `<span class="theme-lock-hint">${esc(th.hint)}</span>` : "";
+      // If still locked and its unlock depends on a DISABLED module, say so
+      // instead of a hint that can never come true (e.g. Flawless with
+      // Achievements turned off). answer_streak-gated themes need no module.
+      let hintText = "";
+      if (!unlocked) {
+        const reqMod = E.themeUnlockModule(th.unlock);
+        hintText = (reqMod && !E.moduleEnabled(u, reqMod))
+          ? `Needs the ${(E.gameModule(reqMod) || {}).name || reqMod} module on`
+          : (th.hint || "");
+      }
+      const hint = hintText ? `<span class="theme-lock-hint">${esc(hintText)}</span>` : "";
       return `<button type="button" class="theme-swatch${selected ? " is-selected" : ""}" data-theme="${esc(th.id)}"`
         + `${unlocked ? "" : " data-locked disabled"} aria-pressed="${selected ? "true" : "false"}">`
         + `<span class="theme-swatch-preview" aria-hidden="true"></span>`

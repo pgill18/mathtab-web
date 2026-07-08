@@ -296,9 +296,23 @@
   // no CLI counterpart.) unlock:null => always available (the base look).
   function themeUnlocked(data, unlock) {
     if (!unlock) return true;
-    if (unlock.type === "streak") return (gameState(data, "daily-streak").best || 0) >= unlock.days;
-    if (unlock.type === "badge") return (gameState(data, "achievements").unlocked || []).includes(unlock.id);
+    // read-only accessor (does NOT lazily create data.game[mid], unlike gameState)
+    const g = (mid) => (data.game && data.game[mid]) || {};
+    if (unlock.type === "answer_streak") return (data.streak_best || 0) >= unlock.n;
+    if (unlock.type === "level") return xpLevel(g("xp").xp || 0) >= unlock.min;
+    if (unlock.type === "badge") return (g("achievements").unlocked || []).includes(unlock.id);
+    if (unlock.type === "streak") return (g("daily-streak").best || 0) >= unlock.days;
     return false;
+  }
+  // Which gamification module a theme's unlock depends on (so the picker can say
+  // "needs the X module on" instead of an unlockable-forever hint when it's off).
+  // answer_streak reads the always-tracked core field, so it needs no module.
+  function themeUnlockModule(unlock) {
+    if (!unlock) return null;
+    if (unlock.type === "badge") return "achievements";
+    if (unlock.type === "level") return "xp";
+    if (unlock.type === "streak") return "daily-streak";
+    return null;
   }
   function rowFullyMastered(data, n) {
     return grid().every((j) => masteryBin(peekCell(data, n, j)) === "mastered");
@@ -509,7 +523,7 @@
     applyLessonResult, overallMastery, rowCells, diagonalCells, blockCells,
     encodeMatch, decodeMatch, decideWinner,
     fnv, rivalById, rivalIsSpecialty, rivalPlay, ladderRank, recordRivalResult,
-    setGamification, gameModule, moduleEnabled, gameState, emit, xpLevel, themeUnlocked,
+    setGamification, gameModule, moduleEnabled, gameState, emit, xpLevel, themeUnlocked, themeUnlockModule,
     beginSession, endSession, isoWeek,
     randInt, randCell, randQuestions, sample, shuffle,
   };
